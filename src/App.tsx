@@ -49,7 +49,7 @@ export default function App() {
   // PWA service worker
   useEffect(() => {
     if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+      navigator.serviceWorker.register('./sw.js').catch(() => undefined);
     }
   }, []);
 
