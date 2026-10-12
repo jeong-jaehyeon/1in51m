@@ -352,6 +352,7 @@ const PHASE_FLAVOR: FEntry[] = [
   { a: 7, b: 12, lines: ['받아쓰기 100점. 냉장고에 붙었다.', '운동회 계주에서 넘어졌다. 무릎이 까졌다.', '같은 반 {mWa} 절교했다가 다음 날 화해했다.', '학원 셔틀버스에서 꾸벅 졸았다.', '생일 파티에 {mGa} 왔다.'] },
   { a: 13, b: 15, lines: ['사춘기. 방문을 닫고 산다.', '첫 시험에서 반 평균을 넘겼다.', '좋아하는 연예인 사진을 책상에 붙였다.', '{mWa} 같은 고등학교를 가고 싶다고 했다.', '밤 12시, 수학 오답노트를 펼쳤다.'] },
   { a: 16, b: 18, lines: ['모의고사 성적표가 왔다.', '야자 시간에 꾸벅 졸다 걸렸다.', '급식 빵이 맛있다는 소문이 났다.', '수능 D-{dday}. 책상 앞에 붙였다.'] },
+  { a: 19, b: 24, if: (st) => st.player.edu !== 'none' && st.player.edu !== 'hs', lines: ['MT를 갔다. 과 사람들과 친해졌다.', '동아리에 들었다.', '축제 주점에서 서빙했다.', 'CC가 생겼다.', '학점 관리에 비상이 걸렸다.', '교양 강의에서 꿀잼 교수를 만났다.'] },
   { a: 20, b: 29, if: huntReady, lines: ['취업 포털에 이력서를 올렸다. 서류만 {n}번째다.'] },
   { a: 20, b: 29, if: (st) => huntReady(st) && !st.player.flags['certDone'], lines: ['취업을 위해 컴활 1급 시험을 봤다.', '컴활 실기에서 {certR}. 취업용인데.', '한국사 1급을 땄다. 공무원 가산점용이다.'] },
   { a: 20, b: 29, if: (st) => hasJob(st) && st.player.workYrs <= 1, lines: ['첫 월급날. 통장을 세 번 확인했다. 세후 {pay}만원이 찍혔다. 너무 좋아서.'] },
@@ -756,16 +757,22 @@ export function stepYear(st: GameState): StepOut {
     p.divorced = true; p.spouse = null; p.money -= 1000;
     feed(st, '이혼했다. 위자료·분할로 1000만 원이 나갔다.', 'bad', '통계청 혼인·이혼통계 2024');
   }
-  if (age >= 40 && age <= 60 && !p.flags['parent'] && ch(rng, 0.12)) {
-    p.flags['parent'] = true;
-    p.parentsAlive = false;
-    const inherit = [0, 50, 100, 200, 500][p.quintile - 1] * 100;
-    const care = ch(rng, RATES.parentCare);
-    p.money += inherit - 1000 - (care ? 1200 : 0);
-    if (inherit === 0 && !care) feed(st, '부모상. 장례비 1000만 원. 유산은 없었다.');
-    else if (inherit === 0) feed(st, '부모상. 생전 간병비 1200만 원, 장례비 1000만 원. 유산은 없었다.');
-    else if (care) feed(st, `부모상. 생전 간병비 1200만 원, 장례비 1000만 원, 상속 ${fmtMan(inherit)}.`);
-    else feed(st, `부모상. 장례비 1000만 원, 상속 ${fmtMan(inherit)}.`);
+  if (age >= 40 && age <= 60 && !p.flags['parent'] && !p.flags['careOn'] && ch(rng, 0.025)) {
+    p.flags['careOn'] = true;
+    feed(st, '부모 간병 시작. 연 400만 원이 나간다.');
+  }
+  if (p.flags['careOn'] && p.parentsAlive) p.money -= 400;
+  if (!p.flags['parent']) {
+    const careDying = p.flags['careOn'] && age >= 40 && age <= 75 && ch(rng, 0.18);
+    const sudden = !p.flags['careOn'] && age >= 55 && age <= 75 && ch(rng, 0.03);
+    if (careDying || sudden) {
+      p.flags['parent'] = true;
+      p.parentsAlive = false;
+      const inherit = [0, 50, 100, 200, 500][p.quintile - 1] * 100;
+      p.money += inherit - 1000;
+      if (inherit === 0) feed(st, '부모상. 장례비 1000만 원. 유산은 없었다.');
+      else feed(st, `부모상. 장례비 1000만 원, 상속 ${fmtMan(inherit)}.`);
+    }
   }
   if (age >= 40 && !p.cancer && ch(rng, RATES.cancerDx)) {
     p.cancer = true;
@@ -946,6 +953,10 @@ export function stepYear(st: GameState): StepOut {
   }
   if ((p.service === 'active' || p.service === 'supplement' || p.service === 'officer') && p.serviceLeft > 0) {
     p.serviceLeft -= 1;
+    p.nums['svcYrs'] = (p.nums['svcYrs'] ?? 0) + 1;
+    const ranks = ['', '이병 진급', '일병 진급', '상병 진급', '병장 진급'];
+    const rk = ranks[Math.min(p.nums['svcYrs'], 4)];
+    if (rk) feed(st, `${rk}. 월급이 조금 올랐다.`);
     if (!p.flags['bullyMil'] && ch(rng, 0.25)) {
       p.flags['bullyMil'] = true;
       const r = ask(st, {
