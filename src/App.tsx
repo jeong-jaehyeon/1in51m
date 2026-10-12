@@ -127,6 +127,11 @@ export default function App() {
     if (!st || !st.pending) return;
     if (st.pending.id === 'cancer') resolveCancer(st, key);
     else resolveChoice(st, st.pending.id, key);
+    if (st.over) {
+      clearSave();
+      setScreen('end');
+      return;
+    }
     saveGame(st);
     bump();
   };

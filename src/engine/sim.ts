@@ -80,6 +80,7 @@ export interface Player {
   serviceLeft: number; nco: boolean; officer: boolean;
   spouse: Spouse | null; partner: Partner | null; dateCand: Partner | null;
   kids: number; children: Array<'M' | 'F'>; divorced: boolean;
+  sibOlder: number; sibYounger: number;
   loan: number; loanLeft: number;
   cancer: boolean; dementia: boolean; star: boolean; starRetired: boolean; biz: boolean;
   alive: boolean; deathAge: number; cause: string;
@@ -104,6 +105,7 @@ export interface GameState {
   player: Player; mates: Mate[];
   over: boolean; memorial: boolean;
   pending: PendingChoice | null;
+  condolence: { name: string; age: number; cause: string } | null;
   reflect: number | null;
   auto: boolean; speed: 1 | 2 | 4;
   rank: number; rankTotal: number;
@@ -130,6 +132,10 @@ export function createGame(name: string, seed: number): GameState {
   const fam = pickW(rng, FAMILIES.map((f) => [f, f.w] as const));
   const twin = ch(rng, RATES.twin);
   const luck = rint(rng, 1, 100);
+  // 형제자매: 외동 25%, 1명 50%, 2명+ 25%. 첫째·막내·중간은 생략하고 수만 기록
+  const sibRoll = rnd(rng);
+  const sibTotal = sibRoll < 0.25 ? 0 : sibRoll < 0.75 ? 1 : 2;
+  const sibOlder = sibTotal === 0 ? 0 : Math.floor(rnd(rng) * (sibTotal + 1));
   const grade = Math.max(0, Math.min(100, gauss(rng, 30 + quintile * 9, 15)));
   const st: GameState = {
     v: 1, seed, rng, age: 0, birthYear: 2026,
@@ -151,13 +157,14 @@ export function createGame(name: string, seed: number): GameState {
       job: null, salary: 0, peak: 0, workYrs: 0, retired: false,
       service: sex === 'M' ? 'todo' : 'none', serviceLeft: 0, nco: false, officer: false,
       spouse: null, partner: null, dateCand: null, kids: 0, children: [], divorced: false,
+      sibOlder, sibYounger: sibTotal - sibOlder,
       loan: 0, loanLeft: 0,
       cancer: false, dementia: false, star: false, starRetired: false, biz: false,
       alive: true, deathAge: 0, cause: '',
       lottoWon: 0, journal: {}, log: [], flags: {}, nums: {},
     },
     mates: [], over: false, memorial: false,
-    pending: null, reflect: null, auto: false, speed: 1, rank: 0, rankTotal: 11,
+    pending: null, condolence: null, reflect: null, auto: false, speed: 1, rank: 0, rankTotal: 11,
   };
   const p = st.player;
   const region = REGIONS[regionIdx];
@@ -246,12 +253,14 @@ function mateTick(st: GameState, m: Mate, age: number): void {
   if (!m.alive) return;
   if (ch(rng, baseQ(age, m.sex) + ACCIDENT_Q)) {
     m.alive = false; m.deathAge = age; m.cause = diseaseCause(age, rnd(rng));
-    if (age < 50 || m.cause === '자살') feed(st, `${m.name}(${age}세) 사망. 사인: ${m.cause}.`, 'friend');
+    if (age < 60 && !st.condolence) st.condolence = { name: m.name, age, cause: m.cause };
+    else if (age < 50 || m.cause === '자살') feed(st, `${m.name}(${age}세) 사망. 사인: ${m.cause}.`, 'friend');
     return;
   }
   if (age >= 15 && age <= 85 && ch(rng, suicideQ(age, m.sex))) {
     m.alive = false; m.deathAge = age; m.cause = '자살';
-    feed(st, `${m.name}(${age}세) 사망. 사인: 자살.`, 'friend');
+    if (age < 60 && !st.condolence) st.condolence = { name: m.name, age, cause: '자살' };
+    else feed(st, `${m.name}(${age}세) 사망. 사인: 자살.`, 'friend');
     return;
   }
   if (age === 19) {
@@ -347,7 +356,12 @@ const PHASE_FLAVOR: FEntry[] = [
   { a: 20, b: 29, if: (st) => huntReady(st) && !st.player.flags['certDone'], lines: ['취업을 위해 컴활 1급 시험을 봤다.', '컴활 실기에서 {certR}. 취업용인데.', '한국사 1급을 땄다. 공무원 가산점용이다.'] },
   { a: 20, b: 29, if: (st) => hasJob(st) && st.player.workYrs <= 1, lines: ['첫 월급날. 통장을 세 번 확인했다. 세후 {pay}만원이 찍혔다. 너무 좋아서.'] },
   { a: 20, b: 29, if: (st) => hasJob(st) && st.player.salary > 0 && st.player.salary < 3000, lines: ['월급날. 통장을 세 번 확인했다. 너무 적어서.'] },
-  { a: 20, b: 29, if: (st) => hasJob(st) || st.age >= 25, lines: ['친구 결혼식에 축의금 {gift}만 원을 냈다.'] },
+  { a: 20, b: 29, if: (st) => {
+    if (!hasJob(st) && st.age < 25) return false;
+    const n = st.player.nums;
+    if ((n['giftAge'] ?? -1) !== st.age) { n['giftAge'] = st.age; n['giftN'] = 0; }
+    return (n['giftN'] ?? 0) < 1 + Math.floor(st.player.network / 30);
+  }, lines: ['친구 결혼식에 축의금 {gift}만 원을 냈다.'] },
   { a: 30, b: 49, if: (st) => kidAge(st) >= 6 && kidAge(st) <= 18, lines: ['아이 운동회 날 반차를 썼다.', '아이 학원비 고지서가 왔다.'] },
   { a: 30, b: 49, lines: ['건강검진에서 콜레스테롤 경고를 받았다.'] },
   { a: 30, b: 49, if: (st) => !st.player.flags['bpMed'], lines: ['혈압약을 먹기 시작했다.'] },
@@ -406,7 +420,7 @@ function flavor(st: GameState): void {
   if (t.includes('골프를 배웠다')) st.player.flags['golf'] = true;
   if (t.includes('백내장')) st.player.flags['cataract'] = true;
   if (t.includes('틀니')) st.player.flags['denture'] = true;
-  if (t.includes('축의금')) st.player.money -= gift;
+  if (t.includes('축의금')) { st.player.money -= gift; st.player.nums['giftN'] = (st.player.nums['giftN'] ?? 0) + 1; }
   if (t.includes('D-')) st.player.nums['dday'] = Math.max(1, dday - rint(st.rng, 150, 200));
   if (t.includes('컴활') || t.includes('한국사')) st.player.flags['certDone'] = true;
   st.player.lastFlavor = t;
@@ -603,6 +617,8 @@ function decayStats(st: GameState): void {
   }
   p.mental = Math.max(0, Math.min(100, p.mental + (55 - p.mental) * 0.08));
   p.network = Math.max(0, Math.min(100, p.network + (40 - p.network) * 0.12));
+  if (p.flags['smoke']) p.health = Math.max(0, p.health - 0.3);
+  if (p.flags['drink']) p.health = Math.max(0, p.health - 0.2);
 }
 
 // ---------- main step ----------
@@ -648,6 +664,18 @@ export function stepYear(st: GameState): StepOut {
   const age = st.age;
 
   for (const m of st.mates) mateTick(st, m, age);
+  if (st.condolence) {
+    const cd = st.condolence;
+    st.condolence = null;
+    const r = ask(st, {
+      id: 'condole', title: `${cd.name}(${cd.age}세) 사망. 사인: ${cd.cause}. 조문 갈까?`,
+      options: [
+        { key: 'yes', label: '간다', sub: '부조금 30만, 멘탈 +2' },
+        { key: 'no', label: '못 간다', sub: '멘탈 -2' },
+      ],
+    });
+    if (r) return r;
+  }
   if (age === 7) formClass(st);
 
   // 쌍둥이 서사
@@ -655,6 +683,40 @@ export function stepYear(st: GameState): StepOut {
     if (age === 10) feed(st, '쌍둥이와 같은 반이 됐다. 선생님이 헷갈려한다.');
     if (age === 19) feed(st, pick(rng, ['쌍둥이는 대학에 갔다. 엇갈리기 시작했다.', '쌍둥이는 취업을 택했다.'] as const));
     if (age === 30) feed(st, '쌍둥이가 먼저 결혼했다. 축의금 30만 원을 냈다.');
+  }
+
+  // 형제 서사 (외동 포함)
+  if (p.sibOlder + p.sibYounger > 0) {
+    if (age === 12) feed(st, pick(rng, ['형제와 크게 싸웠다.', '형제와 밤늦게 놀았다.'] as const));
+    if (age === 25) feed(st, pick(rng, ['형제가 독립했다.', '형제가 결혼했다. 축의금을 냈다.'] as const));
+  } else if (age === 12) feed(st, '외동이라 심심했다. 혼자 놀았다.');
+
+  // 흡연·음주 선택 (20세 1회)
+  if (age === 20 && !p.flags['habit']) {
+    p.flags['habit'] = true;
+    const r = ask(st, {
+      id: 'habit', title: '술·담배를 시작할까?',
+      options: [
+        { key: 'both', label: '둘 다 한다', sub: '건강 -·돈 -·멘탈 +' },
+        { key: 'smoke', label: '흡연만 한다', sub: '건강·돈 -' },
+        { key: 'drink', label: '음주만 한다', sub: '돈 -·멘탈 +' },
+        { key: 'none', label: '둘 다 안 한다', sub: '건강 지킴' },
+      ],
+    });
+    if (r) return r;
+  }
+
+  // 반려동물 (25-40세 1회)
+  if (age >= 25 && age <= 40 && !p.flags['petAsked'] && ch(rng, 0.3)) {
+    p.flags['petAsked'] = true;
+    const r = ask(st, {
+      id: 'pet', title: '반려동물을 입양할까?',
+      options: [
+        { key: 'yes', label: '입양한다', sub: '초기 200만 + 연 100만, 멘탈 +' },
+        { key: 'no', label: '안 한다', sub: '현상 유지' },
+      ],
+    });
+    if (r) return r;
   }
 
   // economy first — every year, even choice years
@@ -723,8 +785,41 @@ export function stepYear(st: GameState): StepOut {
     feed(st, '치매 진단. 요양비 2000만 원.', 'bad');
   }
 
-  // 자녀 성장 (첫째 기준)
-  const fk = p.nums['firstKid'] ?? -1;
+  // 중병 발병 (50세+, 심근경색·뇌졸중. 사망원인 통계 부합)
+  if (age >= 50 && !p.flags['majorDone'] && ch(rng, 0.004)) {
+    p.flags['majorDone'] = true;
+    const dz = pick(rng, ['심근경색', '뇌졸중'] as const);
+    p.nums['majorKind'] = dz === '심근경색' ? 1 : 2;
+    feed(st, `응급실. ${dz} 진단.`, 'bad');
+    const r = ask(st, {
+      id: 'major', title: `${dz} 발병`, fact: '50대 이상 심·뇌혈관 사망의 주원인 (통계청 사망원인통계 2024)',
+      options: [
+        { key: 'op', label: '수술한다 (3000만)', sub: '생존율 높음, 후유증' },
+        { key: 'med', label: '약물로 버틴다', sub: '생존율 보통' },
+      ],
+    });
+    if (r) return r;
+  }
+
+  // 반려동물 yearly
+  if (p.flags['pet'] && !p.flags['petDead']) {
+    p.nums['petAge'] = (p.nums['petAge'] ?? 0) + 1;
+    p.money -= 100;
+    p.mental = Math.min(100, p.mental + 3);
+    if ((p.nums['petAge'] ?? 0) >= 15) {
+      p.flags['petDead'] = true;
+      p.mental = Math.max(0, p.mental - 10);
+      feed(st, '콩이가 무지개다리를 건넜다. 15년을 함께했다.', 'bad');
+    }
+  }
+
+  // 자녀 독립 (첫째 기준 +25)
+  const fk2 = p.nums['firstKid'] ?? -1;
+  if (fk2 >= 0 && age - fk2 === 25 && !p.flags['kidOut']) {
+    p.flags['kidOut'] = true;
+    feed(st, '첫째가 분가했다. 빈 둥지가 됐다.');
+  }
+  const fk = fk2;
   if (fk >= 0 && p.kids > 0) {
     const ka = age - fk;
     if (ka === 19 && !p.flags['kidUni']) {
@@ -1124,15 +1219,15 @@ export function stepYear(st: GameState): StepOut {
   }
 
   // lotto: 수동 구매 버튼 or 자동구매 토글 (매주 모달 없음).
-  // 자동구매 ON이면 조용히 굴리고 당첨 때만 피드.
+  // 자동구매 ON이면 조용히 굴리고 1등 때만 사용처를 묻지 않고 예금한다.
   if (age >= 20 && age <= 60 && p.autoLotto && p.money > 0.5) {
     p.money -= 0.5;
-    if (ch(rng, RATES.lottoP)) {
-      const gross = rint(rng, RATES.lottoMin, RATES.lottoMax);
-      const net = Math.round(gross * (1 - RATES.lottoTax));
-      p.money += net; p.lottoWon += net; p.peak = Math.max(p.peak, p.salary + net);
-      feed(st, `로또 자동구매 적중. 세후 ${net.toLocaleString()}만 원 수령.`, 'big');
-    }
+    const hit = lottoDraw(st);
+    if (hit && hit.tier === 1) lottoWin(st, hit.net, true);
+    else if (hit && hit.tier > 1 && hit.tier < 5) {
+      p.money += hit.net; p.lottoWon += hit.net; p.peak = Math.max(p.peak, p.salary + hit.net);
+      feed(st, `로또 ${hit.tier}등. ${hit.net.toLocaleString()}만 원 수령.`, 'big');
+    } else if (hit) feed(st, '로또 5등. 5000원 환급. 본전이다.');
   }
 
   return EMPTY;
@@ -1167,6 +1262,8 @@ function yearlyMoney(st: GameState): void {
     feed(st, '실업급여 6개월분 1080만 원을 받았다.', 'good');
   }
   if (p.carLoan > 0) p.carLoan -= 1;
+  if (p.flags['smoke']) p.money -= 120;
+  if (p.flags['drink']) { p.money -= 150; p.mental = Math.min(100, p.mental + 2); }
   const liv = livingCost(st);
   const tut = tutorCost(st);
   let loanPay = 0;
@@ -1260,31 +1357,50 @@ function computeRank(st: GameState): void {
 
 // ---------- choice resolution ----------
 
-// 수동 로또 구매 (UI 버튼용). 모달 없음.
+// 로또 등급 추첨. 1등만 선택지, 나머지는 즉시 정산.
+function lottoDraw(st: GameState): { tier: number; net: number } | null {
+  const r = rnd(st.rng);
+  if (r < RATES.lottoP) {
+    const gross = rint(st.rng, RATES.lottoMin, RATES.lottoMax);
+    return { tier: 1, net: Math.round(gross * (1 - RATES.lottoTax)) };
+  }
+  if (r < RATES.lottoP + 0.0002) return { tier: 2, net: 3000 };
+  if (r < RATES.lottoP + 0.0017) return { tier: 3, net: 100 };
+  if (r < RATES.lottoP + 0.0097) return { tier: 4, net: 5 };
+  if (r < RATES.lottoP + 0.0397) return { tier: 5, net: 0.5 };
+  return null;
+}
+
+function lottoWin(st: GameState, net: number, silent: boolean): void {
+  const p = st.player;
+  p.money += net; p.lottoWon += net; p.peak = Math.max(p.peak, p.salary + net);
+  if (silent) { p.nums['lottoNet'] = net; return; }
+  p.nums['lottoNet'] = net;
+  feed(st, `로또 1등. 세후 ${net.toLocaleString()}만 원 수령.`, 'big');
+  st.pending = {
+    id: 'lottowin', title: `당첨금 ${net.toLocaleString()}만 원을 어떻게 할까?`,
+    options: [
+      { key: 'debt', label: '빚부터 갚는다', sub: '마음이 놓인다' },
+      { key: 'save', label: '예금한다', sub: '안전하게' },
+      { key: 'spend', label: '펑펑 쓴다', sub: '3할 증발, 스트레스 해소' },
+    ],
+  };
+}
+// 수동 로또 구매 (UI 버튼용). 1~5등 차등.
 export function buyLotto(st: GameState): 'win' | 'lose' | 'poor' | 'closed' {
   const p = st.player;
   if (st.over || st.age < 20 || st.age > 60) return 'closed';
   if (p.money < 0.5) return 'poor';
   p.money -= 0.5;
-  if (ch(st.rng, RATES.lottoP)) {
-    const gross = rint(st.rng, RATES.lottoMin, RATES.lottoMax);
-    const net = Math.round(gross * (1 - RATES.lottoTax));
-    p.money += net; p.lottoWon += net; p.peak = Math.max(p.peak, p.salary + net);
-    p.nums['lottoNet'] = net;
-    feed(st, `로또 1등. 세후 ${net.toLocaleString()}만 원 수령.`, 'big');
-    st.pending = {
-      id: 'lottowin', title: `당첨금 ${net.toLocaleString()}만 원을 어떻게 할까?`,
-      options: [
-        { key: 'debt', label: '빚부터 갚는다', sub: '마음이 놓인다' },
-        { key: 'save', label: '예금한다', sub: '안전하게' },
-        { key: 'spend', label: '펑펑 쓴다', sub: '3할 증발, 스트레스 해소' },
-      ],
-    };
-    return 'win';
-  }
-  feed(st, '로또 낙첨. 5천 원이 증발했다.');
-  return 'lose';
+  const hit = lottoDraw(st);
+  if (!hit) { feed(st, '로또 낙첨. 5천 원이 증발했다.'); return 'lose'; }
+  if (hit.tier === 1) { lottoWin(st, hit.net, false); return 'win'; }
+  if (hit.tier === 5) { feed(st, '로또 5등. 5000원 환급. 본전이다.'); return 'lose'; }
+  p.money += hit.net; p.lottoWon += hit.net; p.peak = Math.max(p.peak, p.salary + hit.net);
+  feed(st, `로또 ${hit.tier}등. ${hit.net.toLocaleString()}만 원 수령.`, 'big');
+  return 'win';
 }
+
 export function resolveChoice(st: GameState, id: string, key: string): void {
   const rng = st.rng;
   const p = st.player;
@@ -1514,6 +1630,41 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
     case 'back':
       if (key === 'yes') { p.flags['abroad'] = false; feed(st, '귀국했다. 다시 한국 물가로 산다.'); }
       else feed(st, '정착한다. 영주권을 알아본다.');
+      break;
+    case 'habit':
+      if (key === 'both' || key === 'smoke') p.flags['smoke'] = true;
+      if (key === 'both' || key === 'drink') p.flags['drink'] = true;
+      feed(st, key === 'none' ? '술·담배를 멀리한다.' : '기호품이 생겼다. 지갑은 얇아진다.');
+      break;
+    case 'pet':
+      if (key === 'yes') {
+        p.flags['pet'] = true;
+        p.nums['petAge'] = 0;
+        p.money -= 200;
+        feed(st, '강아지를 입양했다. 이름은 콩이다.', 'big');
+      } else feed(st, '반려동물은 다음 기회에.');
+      break;
+    case 'major': {
+      const dz = (p.nums['majorKind'] ?? 1) === 1 ? '심근경색' : '뇌졸중';
+      if (key === 'op') {
+        p.money -= 3000;
+        if (ch(rng, 0.85)) { p.health = Math.max(0, p.health - 10); feed(st, `수술 성공. ${dz} 후유증이 남았다.`, 'good'); }
+        else { die(st, dz); return; }
+      } else {
+        if (ch(rng, 0.6)) { p.health = Math.max(0, p.health - 15); feed(st, `약물로 버틴다. ${dz} 후유증이 남았다.`); }
+        else { die(st, dz); return; }
+      }
+      break;
+    }
+    case 'condole':
+      if (key === 'yes') {
+        p.money -= 30;
+        p.mental = Math.min(100, p.mental + 2);
+        feed(st, '조문 다녀왔다. 빈소가 조용했다.', 'good');
+      } else {
+        p.mental = Math.max(0, p.mental - 2);
+        feed(st, '조문을 못 갔다. 마음에 남는다.', 'bad');
+      }
       break;
     case 'guar':
       if (key === 'yes') {
