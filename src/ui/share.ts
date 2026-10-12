@@ -54,7 +54,7 @@ export function renderMyCard(st: GameState): HTMLCanvasElement {
     ['전성기 연봉', `${fmtMan(p.peak)}${p.lottoWon > 0 ? ` (로또 ${fmtMan(p.lottoWon)} 포함)` : ''}`],
     ['결혼·자녀', p.spouse ? `기혼${p.divorced ? '(이혼)' : ''} · 자녀 ${p.kids}명` : '미혼'],
     ['주거', dwellingLabel(st)],
-    ['반 등수', `15명 중 ${st.rank}등`],
+    ['반 등수', `11명 중 ${st.rank}등`],
   ];
   let y = 540;
   ctx.font = `400 38px ${FONT}`;
@@ -69,7 +69,7 @@ export function renderMyCard(st: GameState): HTMLCanvasElement {
   }
   ctx.fillStyle = STAMP;
   ctx.font = `800 44px ${FONT}`;
-  ctx.fillText(`같은 반 15명 중 ${st.rank}등`, 60, y + 30);
+  ctx.fillText(`같은 반 11명 중 ${st.rank}등`, 60, y + 30);
   ctx.fillStyle = INK2;
   ctx.font = `400 28px ${FONT}`;
   ctx.fillText('#5100만분의1 · 실통계 기반 허구', 60, H - 60);
@@ -77,7 +77,7 @@ export function renderMyCard(st: GameState): HTMLCanvasElement {
 }
 
 export function renderPaper(st: GameState): HTMLCanvasElement {
-  const [cv, ctx] = base('우리 반 15명 근황', '같은 해 태어나 각자의 삶을 살았다');
+  const [cv, ctx] = base('우리 반 11명 근황', '같은 해 태어나 각자의 삶을 살았다');
   let y = 230;
   ctx.font = `400 32px ${FONT}`;
   const alive = st.mates.filter((m) => m.alive);
@@ -86,7 +86,7 @@ export function renderPaper(st: GameState): HTMLCanvasElement {
     const line1 = `${m.name} · ${m.univ || '고졸'} → ${m.job || '미정'}`;
     const line2 = m.alive
       ? `${m.married ? `기혼·자녀${m.kids}` : '미혼'} · peak ${fmtMan(m.peak)}`
-      : `† ${m.deathAge}세 · ${m.cause}`;
+      : `(죽음) ${m.deathAge}세 · ${m.cause}`;
     ctx.fillStyle = INK;
     ctx.fillText(line1.slice(0, 30), 60, y);
     ctx.fillStyle = m.alive ? INK2 : ACCENT;

@@ -4,7 +4,7 @@
 // marriage 78%, divorce 0.5%/yr, med cutoff grade>=95, recalibration targets:
 // q5 top 15%, q1 2% (builder: verify against real 2024 tables).
 
-import { REGIONS, FAMILIES, RATES, QUINTILE_START, QUINTILE_LABEL, MPC, afterTax } from '../data/lookup';
+import { REGIONS, FAMILIES, RATES, QUINTILE_START, QUINTILE_LABEL, MPC, REGION_QW, afterTax } from '../data/lookup';
 import { pickUniv, UNIVERSITIES } from '../data/universities';
 import type { SimTier } from '../data/universities';
 import { JOBS, jobLabel } from '../data/jobs';
@@ -44,6 +44,8 @@ export type FocusId = 'study' | 'sport' | 'work' | 'network' | 'rest' | 'art' | 
 
 export interface Spouse { name: string; edu: string; job: string; income: number; classmate: boolean }
 
+export interface Partner { name: string; classmate: boolean; yrs: number; spec: string }
+
 export interface Player {
   name: string; sex: Sex; seed: number;
   regionIdx: number; quintile: number; familyId: string; familyNote: string;
@@ -62,7 +64,8 @@ export interface Player {
   job: Job | null; salary: number; peak: number; workYrs: number; retired: boolean;
   service: 'none' | 'todo' | 'active' | 'supplement' | 'officer' | 'done' | 'exempt';
   serviceLeft: number; nco: boolean; officer: boolean;
-  spouse: Spouse | null; kids: number; divorced: boolean;
+  spouse: Spouse | null; partner: Partner | null; dateCand: Partner | null;
+  kids: number; divorced: boolean;
   loan: number; loanLeft: number;
   cancer: boolean; dementia: boolean; star: boolean; starRetired: boolean; biz: boolean;
   alive: boolean; deathAge: number; cause: string;
@@ -78,7 +81,7 @@ export interface Mate {
   q: number; score: number;
   alive: boolean; deathAge: number; cause: string;
   edu: string; univ: string; job: string; peak: number;
-  married: boolean; kids: number; spouseClass: boolean;
+  married: boolean; kids: number; spouseClass: boolean; dating: boolean;
 }
 
 export interface GameState {
@@ -108,7 +111,8 @@ export function createGame(name: string, seed: number): GameState {
     const pairs = REGIONS.map((r, i) => [i, r.birthW] as const);
     return pickW(rng, pairs);
   })();
-  const quintile = Math.floor(rnd(rng) * 5) + 1;
+  const region0 = REGIONS[regionIdx];
+  const quintile = pickW(rng, (REGION_QW[region0.id] ?? [20, 20, 20, 20, 20]).map((w, i) => [i + 1, w] as const));
   const fam = pickW(rng, FAMILIES.map((f) => [f, f.w] as const));
   const twin = ch(rng, RATES.twin);
   const luck = rint(rng, 1, 100);
@@ -132,19 +136,19 @@ export function createGame(name: string, seed: number): GameState {
       record: false, bankrupt: false,
       job: null, salary: 0, peak: 0, workYrs: 0, retired: false,
       service: sex === 'M' ? 'todo' : 'none', serviceLeft: 0, nco: false, officer: false,
-      spouse: null, kids: 0, divorced: false,
+      spouse: null, partner: null, dateCand: null, kids: 0, divorced: false,
       loan: 0, loanLeft: 0,
       cancer: false, dementia: false, star: false, starRetired: false, biz: false,
       alive: true, deathAge: 0, cause: '',
       lottoWon: 0, journal: {}, log: [], flags: {}, nums: {},
     },
     mates: [], over: false, memorial: false,
-    pending: null, reflect: null, auto: false, speed: 1, rank: 0, rankTotal: 15,
+    pending: null, reflect: null, auto: false, speed: 1, rank: 0, rankTotal: 11,
   };
   const p = st.player;
   const region = REGIONS[regionIdx];
   feed(st, `${p.name} 탄생. ${region.name}(${region.city}), ${fam.name}${twin ? ', 쌍둥이' : ''}. ${sex === 'M' ? '남아' : '여아'}.`, 'big');
-  feed(st, `${QUINTILE_LABEL[quintile - 1]} 가구에서 태어났다.`, undefined, '통계청 가계동향 2024');
+  feed(st, `${QUINTILE_LABEL[quintile - 1]} 가구에서 태어났다. 같은 동네라도 살림살이는 다르다.`, undefined, '통계청 가계동향 2024');
   if (ch(rng, RATES.infantDeath)) {
     p.alive = false; p.deathAge = 0; p.cause = pick(rng, ['선천성 질환', '신생아 폐렴'] as const);
     feed(st, `생후 4개월, ${p.cause}로 세상을 떠났다.`, 'death');
@@ -152,6 +156,8 @@ export function createGame(name: string, seed: number): GameState {
     return st;
   }
   feed(st, '산모·신생아 건강. 분유값이 월 18만 원씩 나간다.');
+  if (p.money < 0) feed(st, `가계 빚 ${Math.abs(Math.round(p.money)).toLocaleString()}만 원에서 시작한다. 부모의 빚이 아이의 출발선이다.`, 'bad');
+  else feed(st, `종잣돈 ${Math.round(p.money).toLocaleString()}만 원으로 시작한다.`);
   return st;
 }
 
@@ -161,8 +167,8 @@ function formClass(st: GameState): void {
   const poolM = MALE.filter((n) => n !== st.player.name);
   const poolF = FEMALE.filter((n) => n !== st.player.name);
   const names: string[] = [];
-  for (let i = 0; i < 7; i++) names.push(poolM.splice(Math.floor(rnd(rng) * poolM.length), 1)[0]);
-  for (let i = 0; i < 7; i++) names.push(poolF.splice(Math.floor(rnd(rng) * poolF.length), 1)[0]);
+  for (let i = 0; i < 5; i++) names.push(poolM.splice(Math.floor(rnd(rng) * poolM.length), 1)[0]);
+  for (let i = 0; i < 5; i++) names.push(poolF.splice(Math.floor(rnd(rng) * poolF.length), 1)[0]);
   for (let i = names.length - 1; i > 0; i--) {
     const j = Math.floor(rnd(rng) * (i + 1));
     [names[i], names[j]] = [names[j], names[i]];
@@ -174,10 +180,10 @@ function formClass(st: GameState): void {
       name, sex, seed: rint(rng, 1, 1e9), q,
       score: Math.max(0, Math.min(100, gauss(rng, 30 + q * 9, 15))),
       alive: true, deathAge: 0, cause: '',
-      edu: '', univ: '', job: '', peak: 0, married: false, kids: 0, spouseClass: false,
+      edu: '', univ: '', job: '', peak: 0, married: false, kids: 0, spouseClass: false, dating: false,
     } satisfies Mate;
   });
-  feed(st, '초등학교 입학. 같은 반 15명이 모였다. 앞으로 죽을 때까지 소식을 주고받는다.', 'big');
+  feed(st, '초등학교 입학. 같은 반 11명이 모였다. 앞으로 죽을 때까지 소식을 주고받는다.', 'big');
 }
 
 function gradeBand(g: number): number {
@@ -256,7 +262,7 @@ function mateTick(st: GameState, m: Mate, age: number): void {
     }
   }
   if (m.job && m.job !== '취준생' && age > 22 && age < 60) m.peak = Math.round(m.peak * 1.015);
-  if (!m.married && age >= 26 && age <= 42 && ch(rng, 0.10)) {
+  if (!m.married && !m.dating && age >= 26 && age <= 42 && ch(rng, 0.10)) {
     m.married = true;
     m.kids = ch(rng, 0.85) ? (ch(rng, 0.4) ? (ch(rng, 0.08) ? 3 : 2) : 1) : 0;
   }
@@ -268,6 +274,11 @@ function mateTick(st: GameState, m: Mate, age: number): void {
 
 function applyFocus(st: GameState): void {
   const p = st.player;
+  if (st.age < 17 && (p.focus === 'work' || p.focus === 'gamble')) {
+    // 미성년: 알바·도박 불가. 심부름 수준으로 대체
+    p.mental = Math.min(100, p.mental + 2);
+    return;
+  }
   switch (p.focus) {
     case 'study': {
       if (st.age < 19) {
@@ -457,6 +468,17 @@ function huntYear(st: GameState): StepOut | null {
   }
   const cand = JOBS.filter((j) => j.tier === letter);
   const j = cand[Math.floor(rnd(rng) * cand.length) % cand.length];
+  if (letter === 'SELF') {
+    // 자영업은 면접이 아니라 인수
+    p.nums['tjob'] = JOBS.indexOf(j);
+    return ask(st, {
+      id: 'takeover', title: `${jobLabel(j)} 인수 기회 (보증금 2500만)`, fact: '자영업은 시험이 아니라 목돈으로 시작한다',
+      options: [
+        { key: 'yes', label: '인수한다', sub: '보증금 2500만 원 필요' },
+        { key: 'no', label: '패스한다', sub: '다음 기회에' },
+      ],
+    });
+  }
   const need = MINGRADE[letter] ?? 0;
   const place = jobPlace(j, REGIONS[p.liveIdx]);
   if (p.grade < need - 10) {
@@ -473,6 +495,20 @@ function huntYear(st: GameState): StepOut | null {
       { key: 'loose', label: '대충 본다', sub: '떨어질 확률 높음' },
     ],
   });
+}
+
+// 원작처럼: 스탯은 가만히 있으면 감쇠한다 (100 찍고 고정 금지)
+function decayStats(st: GameState): void {
+  const p = st.player;
+  if (st.age >= 19) {
+    p.health = Math.max(0, p.health - (st.age >= 70 ? 2 : st.age >= 50 ? 1 : 0.3));
+    if (p.health < 30 && ch(st.rng, 0.1)) {
+      p.money -= 500;
+      feed(st, '입원했다. 병원비 500만 원.', 'bad');
+    }
+  }
+  p.mental = Math.max(0, Math.min(100, p.mental + (55 - p.mental) * 0.08));
+  p.network = Math.max(0, Math.min(100, p.network + (40 - p.network) * 0.12));
 }
 
 // ---------- main step ----------
@@ -522,6 +558,7 @@ export function stepYear(st: GameState): StepOut {
 
   // economy first — every year, even choice years
   applyFocus(st);
+  decayStats(st);
   yearlyMoney(st);
   flavor(st);
 
@@ -532,6 +569,36 @@ export function stepYear(st: GameState): StepOut {
   if (!st.auto && [5, 15, 30, 50, 70].includes(age)) {
     st.reflect = age;
     return { choice: null, reflection: age, died: false };
+  }
+
+  // yearly family/health rolls (매년 실행)
+  if (p.spouse && !p.divorced && age >= 30 && ch(rng, RATES.divorceYr)) {
+    p.divorced = true; p.spouse = null; p.money -= 1000;
+    feed(st, '이혼했다. 위자료·분할로 1000만 원이 나갔다.', 'bad', '통계청 혼인·이혼통계 2024');
+  }
+  if (age >= 40 && age <= 60 && !p.flags['parent'] && ch(rng, 0.12)) {
+    p.flags['parent'] = true;
+    p.parentsAlive = false;
+    const inherit = [0, 50, 100, 200, 500][p.quintile - 1] * 100;
+    p.money += inherit - 1000;
+    feed(st, `부모상. 장례비 1000만 원, 상속 ${inherit.toLocaleString()}만 원.`);
+    if (ch(rng, RATES.parentCare)) { p.money -= 1200; feed(st, '간병비 1200만 원이 나갔다.'); }
+  }
+  if (age >= 40 && !p.cancer && ch(rng, RATES.cancerDx)) {
+    p.cancer = true;
+    const rc = ask(st, {
+      id: 'cancer', title: '암 진단을 받았다',
+      options: [
+        { key: 'full', label: '고액 치료 (5000만)', sub: '생존율 높음' },
+        { key: 'std', label: '표준 치료 (2000만)', sub: '보통' },
+        { key: 'give', label: '치료 포기', sub: '수명 단축' },
+      ],
+    });
+    if (rc) return rc;
+  }
+  if (age >= 75 && !p.dementia && ch(rng, RATES.dementia)) {
+    p.dementia = true; p.money -= 2000;
+    feed(st, '치매 진단. 요양비 2000만 원.', 'bad');
   }
 
   // school violence
@@ -740,15 +807,65 @@ export function stepYear(st: GameState): StepOut {
     if (r) return r;
   }
 
-  if (!p.spouse && !p.divorced && age >= 26 && age <= 40 && ch(rng, 0.18)) {
+  // 연애 시작 (솔로, 22-38세): 소개팅 스펙 공개
+  if (!p.spouse && !p.partner && age >= 22 && age <= 38 && ch(rng, 0.40)) {
+    const cand = st.mates.filter((m) => m.alive && m.sex !== p.sex && !m.married && !m.dating);
+    const isClass = ch(rng, 0.10) && cand.length > 0;
+    const mate = isClass ? cand[Math.floor(rnd(rng) * cand.length) % cand.length] : null;
+    const spec = mate
+      ? `${mate.univ || '대학생'}·${mate.job || '취준생'}`
+      : pick(rng, ['서울권 대졸·사무직', '지방국립 대졸·간호사', '전문대졸·개발자', '고졸·자영업'] as const);
+    p.dateCand = { name: mate ? mate.name : pick(rng, p.sex === 'M' ? FEMALE : MALE), classmate: isClass, yrs: 0, spec };
     const r = ask(st, {
-      id: 'marry', title: '결혼 이야기가 오간다',
+      id: 'date', title: `${p.dateCand.name}(${spec})와 썸이 시작됐다`,
       options: [
-        { key: 'yes', label: '결혼한다', sub: '비용 1500만. 배우자 스펙 공개' },
-        { key: 'later', label: '아직은', sub: '다음 기회에' },
+        { key: 'yes', label: '사귄다', sub: '교제 시작' },
+        { key: 'no', label: '그만둔다', sub: '솔로 유지' },
       ],
     });
     if (r) return r;
+  }
+
+  // 교제 중: 매년 1년씩, 이별 8%, 2년차부터 결혼 선택
+  if (p.partner) {
+    p.partner.yrs += 1;
+    if (ch(rng, 0.08)) {
+      const ex = p.partner;
+      if (ex.classmate) {
+        const m = st.mates.find((x) => x.name === ex.name);
+        if (m) m.dating = false;
+      }
+      p.partner = null;
+      feed(st, `${ex.name}와 헤어졌다. ${ex.yrs}년의 연애가 끝났다.`, 'bad');
+    } else if (p.partner.yrs >= 2 && age <= 45) {
+      const r = ask(st, {
+        id: 'marry', title: `${p.partner.name}와 ${p.partner.yrs}년째 만나는 중`,
+        fact: p.partner.spec,
+        options: [
+          { key: 'yes', label: '결혼한다', sub: '비용 1000만. 배우자 스펙 공개' },
+          { key: 'wait', label: '계속 만난다', sub: '내년에 다시' },
+          { key: 'bye', label: '헤어진다', sub: '정리한다' },
+        ],
+      });
+      if (r) return r;
+    } else if (ch(rng, 0.3)) {
+      feed(st, pick(rng, [`${p.partner.name}와 한강 데이트.`, `${p.partner.name}와 크게 싸웠다. 화해했다.`, `${p.partner.name} 부모님께 인사드렸다.`] as const));
+    }
+  }
+
+  // 출산 선택 (기혼, 3명 상한, 42세까지)
+  if (p.spouse && !p.divorced && p.kids < 3 && age < 42) {
+    const kp = [0.6, 0.25, 0.08][p.kids];
+    if (ch(rng, kp)) {
+      const r = ask(st, {
+        id: 'baby', title: p.kids === 0 ? '아이를 가질까?' : `둘째${p.kids >= 2 ? '·셋째' : ''}를 가질까? (현재 ${p.kids}명)`,
+        options: [
+          { key: 'yes', label: '갖는다', sub: '양육비 시작' },
+          { key: 'no', label: '미룬다', sub: '다음 기회에' },
+        ],
+      });
+      if (r) return r;
+    }
   }
 
   if (age >= 30 && age <= 50 && !p.flags['guar'] && ch(rng, 0.05)) {
@@ -876,6 +993,8 @@ function yearlyMoney(st: GameState): void {
   const mpc = MPC[p.quintile - 1];
   const consume = net > base ? base + (net - base) * mpc : Math.max(net, 0);
   p.money += net - consume;
+  p.nums['lastIn'] = net;
+  p.nums['lastOut'] = Math.round(consume);
   if (p.car !== 'none' && income > 0) {
     const burden = (p.car === 'new' ? 360 : 250) + (p.carLoan > 0 ? 500 : 0);
     if (burden > income * 0.3 && ch(st.rng, 0.3)) {
@@ -883,7 +1002,7 @@ function yearlyMoney(st: GameState): void {
       feed(st, '카푸어다. 차 유지비가 소득의 30%를 넘는다.', 'bad');
     }
   }
-  if (income > 0 && p.money < -income * RATES.bankruptX && !p.bankrupt) {
+  if (income > 0 && st.age < 65 && !p.retired && p.money < -income * RATES.bankruptX && !p.bankrupt) {
     p.bankrupt = true; p.money = 0; p.record = true;
     feed(st, '파산 선고. 빚은 탕감됐지만 기록이 남았다.', 'bad');
   }
@@ -1087,34 +1206,63 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
         else feed(st, '그해 코인 시장은 횡보했다. 무소식.');
       }
       break;
-    case 'marry': {
+    case 'date': {
+      const dc = p.dateCand;
+      p.dateCand = null;
+      if (!dc) break;
       if (key === 'yes') {
-        p.money -= 1500;
-        const cand = st.mates.filter((m) => m.alive && m.sex !== p.sex && !m.married);
-        const isClass = ch(rng, RATES.classmateMarry) && cand.length > 0;
-        if (isClass) {
-          const mate = cand[Math.floor(rnd(rng) * cand.length) % cand.length];
-          mate.married = true; mate.spouseClass = true;
-          p.spouse = { name: mate.name, edu: mate.edu || '대졸', job: mate.job || '직장인', income: Math.max(2000, mate.peak), classmate: true };
-          feed(st, `같은 반 ${mate.name}와 결혼했다.`, 'big');
-        } else {
-          const edu = pick(rng, ['서울권 대졸', '지방국립 대졸', '전문대졸', '고졸'] as const);
-          const job = pick(rng, ['사무직', '간호사', '교사', '개발자', '자영업', '공무원'] as const);
-          p.spouse = { name: pick(rng, p.sex === 'M' ? FEMALE : MALE), edu, job, income: rint(rng, 2200, 4200), classmate: false };
-          feed(st, `${p.spouse.name}(${p.spouse.edu}, ${p.spouse.job}, 연봉 ${p.spouse.income}만)와 결혼했다.`, 'big');
-        }
-        if (ch(rng, 0.85)) {
-          p.kids = 1 + (ch(rng, RATES.kids2) ? 1 : 0) + (ch(rng, RATES.kids3) ? 1 : 0);
-          feed(st, `자녀 ${p.kids}명. 분유값·학원비가 시작됐다.`);
-        }
-        p.dwelling = '전세';
-        p.deposit = Math.round(8000 * REGIONS[p.liveIdx].houseIdx);
-        const down = Math.round(p.deposit * 0.3);
-        p.money -= down;
-        feed(st, `전세 ${p.deposit.toLocaleString()}만 원에 신혼집을 구했다. 계약금 ${down.toLocaleString()}만 원 + 전세대출. (${REGIONS[p.liveIdx].name})`);
-      } else feed(st, '아직은. 다음 기회에.');
+        p.partner = { name: dc.name, classmate: dc.classmate, yrs: 0, spec: dc.spec };
+        if (dc.classmate) {
+          const m = st.mates.find((x) => x.name === dc.name);
+          if (m) m.dating = true;
+          feed(st, `같은 반 ${dc.name}와 사귀기 시작했다.`, 'big');
+        } else feed(st, `${dc.name}와 사귀기 시작했다. (${dc.spec})`, 'big');
+      } else feed(st, '썸은 썸으로 끝났다.');
       break;
     }
+    case 'marry': {
+      if (key === 'bye') {
+        const ex = p.partner;
+        if (ex?.classmate) {
+          const m = st.mates.find((x) => x.name === ex.name);
+          if (m) m.dating = false;
+        }
+        feed(st, ex ? `${ex.name}와 헤어졌다.` : '헤어졌다.', 'bad');
+        p.partner = null;
+        break;
+      }
+      if (key !== 'yes') { feed(st, '계속 만난다.'); break; }
+      p.money -= 1000;
+      const pt = p.partner;
+      if (pt?.classmate) {
+        const mate = st.mates.find((x) => x.name === pt.name);
+        if (mate) { mate.married = true; mate.spouseClass = true; mate.dating = false; }
+        p.spouse = { name: pt.name, edu: (mate?.univ || mate?.edu || '대졸'), job: mate?.job || '직장인', income: Math.max(2000, mate?.peak ?? 2500), classmate: true };
+        feed(st, `같은 반 ${pt.name}와 결혼했다.`, 'big');
+      } else if (pt) {
+        const edu = pick(rng, ['서울권 대졸', '지방국립 대졸', '전문대졸', '고졸'] as const);
+        const job = pick(rng, ['사무직', '간호사', '교사', '개발자', '자영업', '공무원'] as const);
+        p.spouse = { name: pt.name, edu, job, income: rint(rng, 2200, 4200), classmate: false };
+        feed(st, `${pt.name}(${edu}, ${job}, 연봉 ${p.spouse.income}만)와 결혼했다.`, 'big');
+      } else {
+        p.spouse = { name: pick(rng, p.sex === 'M' ? FEMALE : MALE), edu: '대졸', job: '사무직', income: 3000, classmate: false };
+        feed(st, `${p.spouse.name}와 결혼했다.`, 'big');
+      }
+      p.partner = null;
+      p.dwelling = '전세';
+      p.deposit = Math.round(8000 * REGIONS[p.liveIdx].houseIdx);
+      const down2 = Math.round(p.deposit * 0.2);
+      p.money -= down2;
+      feed(st, `전세 ${p.deposit.toLocaleString()}만 원에 신혼집을 구했다. 계약금 ${down2.toLocaleString()}만 원 + 전세대출. (${REGIONS[p.liveIdx].name})`);
+      break;
+    }
+    case 'baby':
+      if (key === 'yes') {
+        p.kids += 1;
+        p.money -= 300;
+        feed(st, p.kids === 1 ? '첫 아이가 태어났다. 조리원비 300만 원.' : `자녀 ${p.kids}명째. 양육비가 늘었다.`, 'big');
+      } else feed(st, '아이 계획은 미룬다.');
+      break;
     case 'car':
       if (key === 'used') { p.car = 'used'; p.money -= 800; feed(st, '중고차를 샀다. 800만 원. 유지비 연 250만 원.'); }
       else if (key === 'new') { p.car = 'new'; p.carLoan = 5; p.money -= 300; feed(st, '신차 할부. 선수금 300만, 5년 할부 연 500만 + 유지비 연 360만 원.'); }
@@ -1138,6 +1286,32 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
         else feed(st, '잘 해결됐다. 우정이 깊어졌다.', 'good');
       } else { p.network = Math.max(0, p.network - 3); feed(st, '거절했다. 서먹해졌다.'); }
       break;
+    case 'takeover': {
+      const ti = p.nums['tjob'] ?? -1;
+      const j: Job | null = ti >= 0 && ti < JOBS.length ? JOBS[ti] : null;
+      if (key === 'yes' && j) {
+        if (p.money < 2500) { feed(st, '보증금이 모자라 인수가 무산됐다.', 'bad'); break; }
+        p.money -= 2500;
+        p.job = j; p.jobPlace = jobLabel(j);
+        p.salary = Math.round(j.base * (0.9 + rnd(rng) * 0.2));
+        p.peak = Math.max(p.peak, p.salary);
+        p.nums['fails'] = 0;
+        feed(st, `인수 개업: ${jobLabel(j)}. 목돈으로 시작했다.`, 'big');
+        if (!p.flags['carOffered']) {
+          p.flags['carOffered'] = true;
+          st.pending = {
+            id: 'car', title: '첫 월급 기념, 차를 살까?',
+            options: [
+              { key: 'used', label: '중고차 (800만)', sub: '유지비 연 250만' },
+              { key: 'new', label: '신차 할부 (2500만, 5년)', sub: '유지비 연 360만 + 할부 연 500만' },
+              { key: 'no', label: '안 산다', sub: '대중교통으로 버틴다' },
+            ],
+          };
+          return;
+        }
+      } else feed(st, '인수 기회를 패스했다.');
+      break;
+    }
     case 'interview': {
       const ti = p.nums['tjob'] ?? -1;
       const j: Job | null = ti >= 0 && ti < JOBS.length ? JOBS[ti] : null;
@@ -1150,11 +1324,12 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
         p.peak = Math.max(p.peak, p.salary);
         p.nums['fails'] = 0;
         const why: string[] = [];
+        if (p.luck >= 85) why.push('운이 좋아서');
         if (p.grade >= 75) why.push(`수능 ${p.suneung}등급`);
         if (p.network >= 70) why.push('지인 추천');
         if (p.nco || p.officer) why.push('군 경력');
         if (p.flags['specialHs']) why.push('특목고');
-        if (p.luck >= 80) why.push('운');
+        if (p.luck >= 80 && p.luck < 85) why.push('운');
         if (why.length === 0) why.push(p.track === 'ee' && j.tier !== 'PROD' ? '이공계 전공' : '체력·인성');
         feed(st, `최종 합격: ${place}. ${why.slice(0, 2).join(' + ')} 덕분이다.`, 'big');
         feed(st, `초임 ${Math.round(afterTax(p.salary)).toLocaleString()}만원(세후).`, undefined, '워크넷 2024 기반 추정치');
@@ -1187,33 +1362,6 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
     }
     default:
       break;
-  }
-  if (p.spouse && !p.divorced && st.age >= 30 && ch(rng, RATES.divorceYr)) {
-    p.divorced = true; p.spouse = null; p.money -= 1000;
-    feed(st, '이혼했다. 위자료·분할로 1000만 원이 나갔다.', 'bad', '통계청 혼인·이혼통계 2024');
-  }
-  if (st.age >= 40 && st.age <= 60 && !p.flags['parent'] && ch(rng, 0.12)) {
-    p.flags['parent'] = true;
-    p.parentsAlive = false;
-    const inherit = [0, 50, 100, 200, 500][p.quintile - 1] * 100;
-    p.money += inherit - 1000;
-    feed(st, `부모상. 장례비 1000만 원, 상속 ${inherit.toLocaleString()}만 원.`);
-    if (ch(rng, RATES.parentCare)) { p.money -= 1200; feed(st, '간병비 1200만 원이 나갔다.'); }
-  }
-  if (st.age >= 40 && !p.cancer && ch(rng, RATES.cancerDx)) {
-    p.cancer = true;
-    st.pending = {
-      id: 'cancer', title: '암 진단을 받았다',
-      options: [
-        { key: 'full', label: '고액 치료 (5000만)', sub: '생존율 높음' },
-        { key: 'std', label: '표준 치료 (2000만)', sub: '보통' },
-        { key: 'give', label: '치료 포기', sub: '수명 단축' },
-      ],
-    };
-  }
-  if (st.age >= 75 && !p.dementia && ch(rng, RATES.dementia)) {
-    p.dementia = true; p.money -= 2000;
-    feed(st, '치매 진단. 요양비 2000만 원.', 'bad');
   }
 }
 

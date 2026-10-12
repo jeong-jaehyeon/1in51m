@@ -154,7 +154,7 @@ export default function App() {
             <h1><em>5100만</em>분의 1</h1>
             <p className="lede">
               지금 이 순간에도 한국에서 아기가 태어납니다. 그중 한 명이 되어 단 한 번뿐인 삶을 끝까지 살아봅니다.
-              어디서, 누구의 아이로 태어날지는 고를 수 없습니다. 당신과 같은 반 15명과 함께.
+              어디서, 누구의 아이로 태어날지는 고를 수 없습니다. 당신과 같은 반 11명과 함께.
             </p>
             <div className="counter">
               <div><strong>{births.toLocaleString()}</strong><span>이 페이지가 열린 뒤 태어난 아기</span></div>
@@ -175,7 +175,7 @@ export default function App() {
             <h3>이 게임에 대하여</h3>
             <p className="muted">
               13개 권역·소득 5분위·한국 100개 대학·100개 직업의 실제 통계를 뼈대로,
-              같은 반 15명이 병렬로 살아가는 풀라이프 시뮬레이션입니다. 노력해도 통계를 벗어나기 어렵습니다.
+              같은 반 11명이 병렬로 살아가는 풀라이프 시뮬레이션입니다. 노력해도 통계를 벗어나기 어렵습니다.
               극소수에게만 역전이 허락됩니다.
             </p>
           </div>
@@ -299,6 +299,9 @@ function Play(props: {
                 <div><b>{p.job && !p.retired ? fmtMan(Math.round(p.salary / 12)) + '/월' : p.retired ? '연금생활' : '-'}</b><small>월 소득(세전)</small></div>
               </div>
               {p.loanLeft > 0 && <div className="small">학자금 잔여 {p.loanLeft}년</div>}
+              {st.age > 20 && ((p.nums['lastIn'] ?? 0) > 0 || (p.nums['lastOut'] ?? 0) > 0) && (
+                <div className="small">작년 소득 +{fmtMan(p.nums['lastIn'] ?? 0)} / 지출 -{fmtMan(p.nums['lastOut'] ?? 0)}</div>
+              )}
               {st.age >= 20 && st.age <= 60 && (
                 <div className="row" style={{ marginTop: 8 }}>
                   <button
@@ -323,11 +326,14 @@ function Play(props: {
             <div className="panel">
               <h3>올해의 집중 · {st.age}세</h3>
               <div className="chips">
-                {FOCI.map((f) => (
-                  <button key={f.id} className="chip" aria-pressed={p.focus === f.id} onClick={() => setFocus(f.id as typeof p.focus)}>
-                    {f.name}<small>{f.desc}</small>
-                  </button>
-                ))}
+                {FOCI.map((f) => {
+                  const locked = (f.id === 'work' || f.id === 'gamble') && st.age < 17;
+                  return (
+                    <button key={f.id} className="chip" aria-pressed={p.focus === f.id} disabled={locked} title={locked ? '17세부터 가능' : undefined} onClick={() => setFocus(f.id as typeof p.focus)}>
+                      {f.name}<small>{locked ? '17세부터' : f.desc}</small>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="panel">
@@ -344,7 +350,7 @@ function Play(props: {
           </div>
           <div className="col">
             <div className="panel">
-              <h3>같은 반 15명 · 생존 {aliveMates}명</h3>
+              <h3>같은 반 11명 · 생존 {aliveMates}명</h3>
               {st.mates.length === 0
                 ? <div className="muted">초등 입학 때 만난다.</div>
                 : (
@@ -353,7 +359,7 @@ function Play(props: {
                       <tbody>
                         {st.mates.slice(0, 10).map((m) => (
                           <tr key={m.name}>
-                            <td><b>{m.name}</b><br /><span className="small">{m.alive ? '생존' : `†${m.deathAge}세·${m.cause}`}</span></td>
+                            <td><b>{m.name}</b><br /><span className="small">{m.alive ? '생존' : `(죽음) ${m.deathAge}세·${m.cause}`}</span></td>
                             <td>{m.univ || (st.age >= 19 ? '고졸' : '재학중')} → {m.job || '-'}<br /><span className="small">{m.married ? `기혼·자녀${m.kids}` : '미혼'} · {fmtMan(m.peak)}</span></td>
                           </tr>
                         ))}
@@ -493,7 +499,7 @@ function End(props: { st: GameState; say: (t: string) => void; onRebirth: () => 
             <div><b>{fmtMan(p.peak)}</b><small>전성기 연봉{p.lottoWon > 0 ? ` (로또 ${fmtMan(p.lottoWon)} 포함)` : ''}</small></div>
             <div><b>{p.spouse ? `기혼${p.divorced ? '(이혼)' : ''} · 자녀 ${p.kids}명` : '미혼'}</b><small>가족</small></div>
             <div><b>{dwellingLabel(st)}</b><small>주거</small></div>
-            <div><b>15명 중 {st.rank}등</b><small>같은 반 종합 순위 (수능3:대학3:소득4)</small></div>
+            <div><b>11명 중 {st.rank}등</b><small>같은 반 종합 순위 (수능3:대학3:소득4)</small></div>
           </div>
           {journals.length > 0 && (
             <div className="paper2">
@@ -514,21 +520,21 @@ function End(props: { st: GameState; say: (t: string) => void; onRebirth: () => 
         </div>
       </div>
       <div className="card paper2">
-        <h3>우리 반 15명 근황</h3>
+        <h3>우리 반 11명 근황</h3>
         <table>
           <thead><tr><th>이름</th><th>학력 → 직업</th><th>현황</th></tr></thead>
           <tbody>
-            <tr><td><b>{p.name} (나)</b></td><td>{p.univName || '진학 없음'} → {p.job ? jobLabel(p.job) : '무직'}</td><td>† {p.deathAge}세 · {p.cause}</td></tr>
+            <tr><td><b>{p.name} (나)</b></td><td>{p.univName || '진학 없음'} → {p.job ? jobLabel(p.job) : '무직'}</td><td>(죽음) {p.deathAge}세 · {p.cause}</td></tr>
             {st.mates.map((m) => (
               <tr key={m.name}>
                 <td>{m.name}</td>
                 <td>{m.univ || '고졸'} → {m.job || '미정'}</td>
-                <td>{m.alive ? `생존 · ${m.married ? `기혼·자녀${m.kids}` : '미혼'} · ${fmtMan(m.peak)}` : `† ${m.deathAge}세 · ${m.cause}`}</td>
+                <td>{m.alive ? `생존 · ${m.married ? `기혼·자녀${m.kids}` : '미혼'} · ${fmtMan(m.peak)}` : `(죽음) ${m.deathAge}세 · ${m.cause}`}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {dead.length > 0 && <p className="small">추모: {dead.map((m) => `${m.name} (†${m.deathAge}·${m.cause})`).join(', ')}</p>}
+        {dead.length > 0 && <p className="small">추모: {dead.map((m) => `${m.name} ((죽음) ${m.deathAge}세·${m.cause})`).join(', ')}</p>}
       </div>
       <footer className="appfoot" style={{ maxWidth: 'none', padding: '0 0 48px' }}>
         <div className="legal">{FOOTER_NOTE} · v1.0.0 · <a href={`mailto:${CONTACT}`}>{CONTACT}</a></div>

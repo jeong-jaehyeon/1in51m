@@ -38,6 +38,23 @@ export const QUINTILE_LABEL = [
 // 한계소비성향 (가계동향 2024 평균소비성향 ≈70% 언저리 반영)
 export const MPC = [0.9, 0.8, 0.72, 0.65, 0.55];
 
+// 권역별 소득분위 가중 (같은 강남이라도 반지하가 있다. 지역 소득격차 반영)
+export const REGION_QW: Record<string, number[]> = {
+  gangnam: [4, 8, 15, 28, 45],
+  seoulN: [10, 15, 25, 25, 25],
+  gyeongS: [12, 16, 24, 24, 24],
+  gyeongN: [20, 22, 24, 18, 16],
+  busan: [18, 22, 24, 20, 16],
+  daegu: [20, 22, 24, 18, 16],
+  incheon: [18, 20, 24, 20, 18],
+  gwangju: [20, 22, 24, 18, 16],
+  daejeon: [18, 20, 24, 20, 18],
+  ulsan: [15, 18, 24, 22, 21],
+  midcity: [24, 24, 22, 16, 14],
+  rural: [35, 25, 18, 12, 10],
+  sejong: [15, 18, 25, 22, 20],
+};
+
 export interface FamilyType { id: string; name: string; w: number; money: number; mental: number; note: string }
 
 export const FAMILIES: FamilyType[] = [

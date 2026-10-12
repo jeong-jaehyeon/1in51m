@@ -32,6 +32,8 @@ export function loadGame(): GameState | null {
     if (pl['parentsAlive'] === undefined) pl['parentsAlive'] = true;
     if (pl['autoLotto'] === undefined) pl['autoLotto'] = false;
     if (pl['lastFlavor'] === undefined) pl['lastFlavor'] = '';
+    if (pl['partner'] === undefined) pl['partner'] = null;
+    if (pl['dateCand'] === undefined) pl['dateCand'] = null;
     if (pl['nums'] === undefined) pl['nums'] = {};
     if (pl['baseGrade'] === undefined) pl['baseGrade'] = (o.player as GameState['player']).grade;
     if (pl['studyYrs'] === undefined) pl['studyYrs'] = 0;
