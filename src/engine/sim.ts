@@ -717,6 +717,48 @@ export function stepYear(st: GameState): StepOut {
   }
   if (age === 7) formClass(st);
 
+  // 반수·휴학·전과편입 (대학 재학 중 1회씩)
+  const inUni = (p.edu === 'sk' || p.edu === 'seoul' || p.edu === 'jgeo' || p.edu === 'jun' || p.edu === 'med') && age >= 19 && age <= 24;
+  if (inUni && !p.flags['bansu'] && ch(rng, 0.2)) {
+    p.flags['bansu'] = true;
+    const r = ask(st, {
+      id: 'bansu', title: '반수를 할까? (다니면서 수능 재도전)',
+      options: [
+        { key: 'yes', label: '한다', sub: '비용 500만, 30% 상위 티어 편입' },
+        { key: 'no', label: '안 한다', sub: '현상 유지' },
+      ],
+    });
+    if (r) return r;
+  }
+  if (inUni && !p.flags['leave_uni'] && ch(rng, 0.15)) {
+    p.flags['leave_uni'] = true;
+    const r = ask(st, {
+      id: 'leaveuni', title: '1년 휴학할까?',
+      options: [
+        { key: 'yes', label: '쉰다', sub: '알바 +500만, 여행' },
+        { key: 'no', label: '계속 다닌다', sub: '현상 유지' },
+      ],
+    });
+    if (r) return r;
+  }
+  if (inUni && !p.flags['transfer'] && ch(rng, 0.15)) {
+    p.flags['transfer'] = true;
+    const r = ask(st, {
+      id: 'transfer', title: '전과·편입에 도전할까?',
+      options: [
+        { key: 'yes', label: '도전한다', sub: '성적 80+면 상위 티어 편입' },
+        { key: 'no', label: '안 한다', sub: '현상 유지' },
+      ],
+    });
+    if (r) return r;
+  }
+  // 소년원 (생기부 전과 + 비행)
+  if (p.record && age >= 15 && age <= 18 && !p.flags['juvie'] && ch(rng, 0.2)) {
+    p.flags['juvie'] = true;
+    p.network = Math.max(0, p.network - 10);
+    p.mental = Math.max(0, p.mental - 10);
+    feed(st, '소년원 1년. 전과가 하나 더 늘었다.', 'bad');
+  }
   // 쌍둥이 서사
   if (p.twin && p.alive) {
     const tn = p.twinName || '쌍둥이';
@@ -2007,6 +2049,37 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
         p.nums['leaveNext'] = 1;
         feed(st, '육아휴직 1년. 소득이 반감된다.');
       } else feed(st, '바로 복귀했다.');
+      break;
+    case 'bansu':
+      if (key === 'yes') {
+        p.money -= 500;
+        if (ch(rng, 0.30)) {
+          const order: Array<SimTier | 'hs'> = ['hs', 'jun', 'jgeo', 'seoul', 'sk', 'med'];
+          const cur = p.edu === 'none' ? 'hs' : p.edu;
+          const ni = Math.min(order.indexOf('sk'), order.indexOf(cur) + 1);
+          p.edu = order[ni];
+          if (p.edu !== 'hs' && p.edu !== 'med') p.univName = pickUniv(p.edu, rnd(rng)).name;
+          else if (p.edu === 'med') p.univName = '지방의대 의예과';
+          feed(st, `반수 성공. ${p.univName}로 편입했다.`, 'big');
+        } else feed(st, '반수 실패. 1년을 날렸다.', 'bad');
+      } else feed(st, '반수는 안 한다.');
+      break;
+    case 'leaveuni':
+      if (key === 'yes') { p.money += 500; feed(st, '1년 휴학. 알바로 500만 원 벌고 여행을 다녀왔다.'); }
+      else feed(st, '휴학 없이 다닌다.');
+      break;
+    case 'transfer':
+      if (key === 'yes') {
+        if (p.grade >= 80) {
+          const order: Array<SimTier | 'hs'> = ['hs', 'jun', 'jgeo', 'seoul', 'sk', 'med'];
+          const cur = p.edu === 'none' ? 'hs' : p.edu;
+          const ni = Math.min(order.indexOf('sk'), order.indexOf(cur) + 1);
+          p.edu = order[ni];
+          if (p.edu !== 'hs' && p.edu !== 'med') p.univName = pickUniv(p.edu, rnd(rng)).name;
+          else if (p.edu === 'med') p.univName = '지방의대 의예과';
+          feed(st, `편입 성공. ${p.univName}로 옮겼다.`, 'big');
+        } else feed(st, '편입 탈락. 성적 미달이다.', 'bad');
+      } else feed(st, '전과·편입은 안 한다.');
       break;
     case 'wedding':
       if (key === 'yes') {
