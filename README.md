@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# 5100만분의 1
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+한국에서 태어나 죽을 때까지 사는 무료 인생 시뮬레이션. 2024 실통계를 뼈대로, 같은 반 15명이 병렬로 살아간다.
 
-Currently, two official plugins are available:
+- `npm install` / `npm run dev` / `npm run build`
+- 스택: Vite + React + TypeScript, 백엔드 없음 (정적 호스팅)
+- 테스트: `?fast=1` 파라미터로 80년 즉시 완주 (빌더 검증용)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 스펙 요약
 
-## React Compiler
+- 출생 → 사망 풀라이프, 1년=15초, x1/x2/x4 + 일시정지 + 자동관전
+- 8개 격차권역 × 소득 5분위 × 가정형태(극한 포함) 출생 뽑기
+- 대학 100개 실명 + 직업 100개(직군 중심) + 실데이터 연봉(세후 표기)
+- 분기 20개 안팎: 입시(특목고/수시정시/재수삼수반수/의대/중퇴검정고시), 군대(현역·보충·부사관·장교·대체복무), 취업·이직·창업·코인·결혼·청약·보증·로또·스타
+- 역전은 극소수: 로또 매년 0.014%, 스타 예체능 한정
+- 같은 반 15명 병렬 시뮬 + 반 신문 + 종합등수(수능3:대학3:소득4)
+- 절차적 도트 초상화 (외부 에셋 0개), PWA, 다크모드, localStorage 이어하기(1슬롯)
+- 공유: 결과 이미지 + 반 신문 PNG, 사망원인 포함 박제
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 데이터 출처 (2024 가용치)
 
-## Expanding the Oxlint configuration
+통계청 인구동향·생명표·가계동향·사교육비·사망원인·혼인-이혼통계, 대학알리미 공시 2025(2024 졸업자 기준),
+고용노동부 워크넷 임금정보 기반 추정치, 복권위 과세·국세청 간이세율 근사.
+수치는 화면에 기준연도와 함께 표기. 교육용 풍자이며 각 기관 공식 입장과 무관.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+문의: wolgus104@naver.com

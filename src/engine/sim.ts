@@ -227,6 +227,7 @@ function mateTick(st: GameState, m: Mate, age: number): void {
   if (age === 19) {
     const tier = tierByGrade(m.score, m.score);
     m.edu = tier === 'hs' ? '고졸' : tier === 'med' ? pick(rng, ['서울대의대', '연세의대', '지방의대'] as const) : pickUniv(tier, rnd(rng)).name;
+    m.univ = tier === 'hs' ? '' : m.edu;
     if (tier === 'med' || (tier === 'sk' && ch(rng, 0.3))) feed(st, `${m.name}, ${m.edu} 입학.`, 'friend');
   }
   if (age === 22 && !m.job) {
