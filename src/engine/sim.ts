@@ -56,7 +56,7 @@ export interface PendingChoice { id: string; title: string; fact?: string; optio
 
 export type FocusId = 'study' | 'sport' | 'work' | 'network' | 'rest' | 'art' | 'love' | 'gamble';
 
-export interface Spouse { name: string; edu: string; job: string; income: number; classmate: boolean }
+export interface Spouse { name: string; edu: string; job: string; income: number; classmate: boolean; age: number; marriedAt: number }
 
 export interface Partner { name: string; classmate: boolean; yrs: number; edu: string; job: string; income: number }
 
@@ -79,7 +79,7 @@ export interface Player {
   service: 'none' | 'todo' | 'active' | 'supplement' | 'officer' | 'done' | 'exempt';
   serviceLeft: number; nco: boolean; officer: boolean;
   spouse: Spouse | null; partner: Partner | null; dateCand: Partner | null;
-  kids: number; divorced: boolean;
+  kids: number; children: Array<'M' | 'F'>; divorced: boolean;
   loan: number; loanLeft: number;
   cancer: boolean; dementia: boolean; star: boolean; starRetired: boolean; biz: boolean;
   alive: boolean; deathAge: number; cause: string;
@@ -150,7 +150,7 @@ export function createGame(name: string, seed: number): GameState {
       record: false, bankrupt: false,
       job: null, salary: 0, peak: 0, workYrs: 0, retired: false,
       service: sex === 'M' ? 'todo' : 'none', serviceLeft: 0, nco: false, officer: false,
-      spouse: null, partner: null, dateCand: null, kids: 0, divorced: false,
+      spouse: null, partner: null, dateCand: null, kids: 0, children: [], divorced: false,
       loan: 0, loanLeft: 0,
       cancer: false, dementia: false, star: false, starRetired: false, biz: false,
       alive: true, deathAge: 0, cause: '',
@@ -347,9 +347,10 @@ const PHASE_FLAVOR: FEntry[] = [
   { a: 20, b: 29, if: (st) => huntReady(st) && !st.player.flags['certDone'], lines: ['취업을 위해 컴활 1급 시험을 봤다.', '컴활 실기에서 {certR}. 취업용인데.', '한국사 1급을 땄다. 공무원 가산점용이다.'] },
   { a: 20, b: 29, if: (st) => hasJob(st) && st.player.workYrs <= 1, lines: ['첫 월급날. 통장을 세 번 확인했다. 세후 {pay}만원이 찍혔다. 너무 좋아서.'] },
   { a: 20, b: 29, if: (st) => hasJob(st) && st.player.salary > 0 && st.player.salary < 3000, lines: ['월급날. 통장을 세 번 확인했다. 너무 적어서.'] },
-  { a: 20, b: 29, if: (st) => hasJob(st) || st.age >= 25, lines: ['친구 결혼식에 축의금 10만 원을 냈다.'] },
+  { a: 20, b: 29, if: (st) => hasJob(st) || st.age >= 25, lines: ['친구 결혼식에 축의금 {gift}만 원을 냈다.'] },
   { a: 30, b: 49, if: (st) => kidAge(st) >= 6 && kidAge(st) <= 18, lines: ['아이 운동회 날 반차를 썼다.', '아이 학원비 고지서가 왔다.'] },
-  { a: 30, b: 49, lines: ['건강검진에서 콜레스테롤 경고를 받았다.', '월급은 그대로인데 물가는 올랐다.', '혈압약을 먹기 시작했다.', '골프를 배웠다.'] },
+  { a: 30, b: 49, lines: ['건강검진에서 콜레스테롤 경고를 받았다.', '혈압약을 먹기 시작했다.', '골프를 배웠다.'] },
+  { a: 30, b: 64, if: (st) => hasJob(st) && st.age % 10 === 0, lines: ['연봉 {payY}만. 10년 전보다 {pct}% 올랐다.'] },
   { a: 30, b: 49, if: (st) => st.player.parentsAlive && st.player.money > 0, lines: ['부모님께 용돈을 보내드렸다.'] },
   { a: 30, b: 49, if: hasJob, lines: ['회식 2차에서 노래를 불렀다.'] },
   { a: 45, b: 60, if: (st) => kidAge(st) >= 19 && kidAge(st) <= 28, lines: ['자녀 등록금 고지서가 왔다.'] },
@@ -377,19 +378,61 @@ function flavor(st: GameState): void {
   const n = st.player.nums['apps'] ?? 0;
   if (st.player.nums['dday'] === undefined) st.player.nums['dday'] = rint(st.rng, 280, 365);
   const dday = Math.max(1, st.player.nums['dday'] ?? 1);
+  const gift = pick(st.rng, [5, 10, 10, 20, 30] as const);
+  const prevSal = st.player.nums['sal10'] ?? st.player.salary;
+  const pct = prevSal > 0 ? Math.round((st.player.salary / prevSal - 1) * 100) : 0;
   const pk = pick(st.rng, ['공', '마이크', '청진기', '돈'] as const);
   t = t.replace('{mWa}', mWa).replace('{mGa}', mGa)
+    .replace('{gift}', String(gift))
     .replace('{pickJ}', pk + josa(pk, '을를'))
     .replace('{pick}', pk)
     .replace('{n}', String(n + 1))
     .replace('{dday}', String(dday))
     .replace('{certR}', pick(st.rng, ['떨어졌다', '붙었다'] as const))
-    .replace('{pay}', Math.round(afterTax(st.player.salary) / 12).toLocaleString());
+    .replace('{pay}', Math.round(afterTax(st.player.salary) / 12).toLocaleString())
+    .replace('{payY}', Math.round(st.player.salary).toLocaleString())
+    .replace('{pct}', String(pct));
+  if (t.includes('10년 전보다')) st.player.nums['sal10'] = st.player.salary;
   if (t.includes('이력서')) st.player.nums['apps'] = n + 1;
+  if (t.includes('축의금')) st.player.money -= gift;
   if (t.includes('D-')) st.player.nums['dday'] = Math.max(1, dday - rint(st.rng, 150, 200));
   if (t.includes('컴활') || t.includes('한국사')) st.player.flags['certDone'] = true;
   st.player.lastFlavor = t;
   feed(st, t);
+}
+
+export function formatKids(p: { kids: number; children: Array<'M' | 'F'> }): string {
+  if (p.children.length !== p.kids || p.kids === 0) return p.kids === 0 ? '없음' : `자녀 ${p.kids}명`;
+  const m = p.children.filter((c) => c === 'M').length;
+  const f = p.kids - m;
+  const parts: string[] = [];
+  if (m > 0) parts.push(`${m}남`);
+  if (f > 0) parts.push(`${f}녀`);
+  return parts.join('');
+}
+
+export function spouseNow(p: { spouse: Spouse | null }, ageNow: number): string {
+  if (!p.spouse) return '미혼';
+  const cur = p.spouse.age + (ageNow - p.spouse.marriedAt);
+  return `${p.spouse.name}(${cur}세)${josa(p.spouse.name, '와과')} 혼인`;
+}
+
+// 전국 비교 (수명: 2024 생명표 e0 기준, 소득: 추정치)
+function normCdf(z: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  let pb = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  if (z > 0) pb = 1 - pb;
+  return pb;
+}
+
+export function compareStat(st: GameState): { life: number; income: number } {
+  const p = st.player;
+  const e0 = p.sex === 'M' ? 80.6 : 86.4;
+  const life = Math.max(1, Math.min(99, Math.round((1 - normCdf((p.deathAge - e0) / 9)) * 100)));
+  const pk = p.peak;
+  const income = pk >= 9000 ? 10 : pk >= 6000 ? 25 : pk >= 4000 ? 50 : pk >= 3000 ? 70 : 90;
+  return { life, income };
 }
 
 export function dwellingLabel(st: GameState): string {
@@ -403,7 +446,7 @@ function livingCost(st: GameState): number {
   let c = Math.round(1800 * region.costIdx + p.kids * 800);
   if (p.dwelling === '자취') c += Math.round(600 * region.houseIdx);
   else if (p.dwelling === '본가') c += 120;
-  else if (p.dwelling === '전세') c += 200 + Math.round(p.deposit * 0.04);
+  else if (p.dwelling === '전세') c += 200 + Math.round(p.deposit * ((p.nums['jeonRate'] ?? 4) / 100));
   else if (p.dwelling === '자가') c += 100 + (p.flags['mortgage'] ? 300 : 0);
   if (p.car === 'used') c += 250;
   else if (p.car === 'new') c += 360;
@@ -541,8 +584,9 @@ function decayStats(st: GameState): void {
   if (st.age >= 19) {
     p.health = Math.max(0, p.health - (st.age >= 70 ? 2 : st.age >= 50 ? 1 : 0.3));
     if (p.health < 30 && ch(st.rng, 0.1)) {
-      p.money -= 500;
-      feed(st, pick(st.rng, ['입원했다. 병원비 500만 원.', '응급실에 실려갔다. 500만 원.', '무릎 수술을 했다. 500만 원.', '정밀검사 입원. 500만 원.', '재활병원에 입원했다. 500만 원.'] as const), 'bad');
+      const fee = st.age < 50 ? 300 : st.age < 70 ? 500 : 1000;
+      p.money -= fee;
+      feed(st, pick(st.rng, [`입원했다. 병원비 ${fee}만 원.`, `응급실에 실려갔다. ${fee}만 원.`, `무릎 수술을 했다. ${fee}만 원.`, `정밀검사 입원. ${fee}만 원.`, `재활병원에 입원했다. ${fee}만 원.`] as const), 'bad');
     }
   }
   p.mental = Math.max(0, Math.min(100, p.mental + (55 - p.mental) * 0.08));
@@ -594,9 +638,27 @@ export function stepYear(st: GameState): StepOut {
   for (const m of st.mates) mateTick(st, m, age);
   if (age === 7) formClass(st);
 
+  // 쌍둥이 서사
+  if (p.twin && p.alive) {
+    if (age === 10) feed(st, '쌍둥이와 같은 반이 됐다. 선생님이 헷갈려한다.');
+    if (age === 19) feed(st, pick(rng, ['쌍둥이는 대학에 갔다. 엇갈리기 시작했다.', '쌍둥이는 취업을 택했다.'] as const));
+    if (age === 30) feed(st, '쌍둥이가 먼저 결혼했다. 축의금 30만 원을 냈다.');
+  }
+
   // economy first — every year, even choice years
   applyFocus(st);
   decayStats(st);
+  // 전세대출 금리 변동 + 주담대 완납 체크
+  if (p.dwelling === '전세') {
+    const r0 = p.nums['jeonRate'] ?? 4.0;
+    const r1 = Math.max(2, Math.min(7, r0 + pick(rng, [-0.5, 0, 0, 0.5] as const)));
+    p.nums['jeonRate'] = Math.round(r1 * 100) / 100;
+    if (Math.abs(r1 - r0) >= 0.5 && ch(rng, 0.3)) feed(st, `전세대출 금리가 연 ${r1.toFixed(2)}%로 ${r1 > r0 ? '올랐다' : '내렸다'}.`);
+  }
+  if (p.flags['mortgage'] && (p.nums['mortStart'] ?? st.age) + 20 <= st.age) {
+    p.flags['mortgage'] = false;
+    feed(st, '주담대 완납. 온전한 내 집이다.', 'big');
+  }
   yearlyMoney(st);
   flavor(st);
 
@@ -640,6 +702,24 @@ export function stepYear(st: GameState): StepOut {
   if (age >= 75 && !p.dementia && ch(rng, RATES.dementia)) {
     p.dementia = true; p.money -= 2000;
     feed(st, '치매 진단. 요양비 2000만 원.', 'bad');
+  }
+
+  // 자녀 성장 (첫째 기준)
+  const fk = p.nums['firstKid'] ?? -1;
+  if (fk >= 0 && p.kids > 0) {
+    const ka = age - fk;
+    if (ka === 19 && !p.flags['kidUni']) {
+      p.flags['kidUni'] = true;
+      feed(st, pick(rng, ['첫째가 대학에 갔다. 등록금이 나간다.', '첫째가 취업했다. 용돈을 받기 시작했다.'] as const));
+    }
+    if (ka === 25 && !p.flags['kidMarry']) {
+      p.flags['kidMarry'] = true;
+      feed(st, '첫째가 결혼했다. 축의금보다 축복을 줬다.');
+    }
+    if (ka === 27 && !(p.nums['grandkids'] ?? 0)) {
+      p.nums['grandkids'] = 1;
+      feed(st, '손주가 태어났다. 할아버지·할머니가 됐다.', 'big');
+    }
   }
 
   // school violence
@@ -763,7 +843,11 @@ export function stepYear(st: GameState): StepOut {
       if (r) return r;
     }
     if (p.serviceLeft === 0) {
+      const wasOfficer = p.officer;
       p.service = 'done';
+      const saved = wasOfficer ? 4000 : 1500;
+      p.money += saved;
+      feed(st, `전역. 복무 중 모은 월급 ${saved}만 원.`, undefined, '국방부 2024 (병장 월 125만)');
       feed(st, '전역. 사회로 돌아왔다.', 'big');
       if (p.nco) feed(st, '부사관 경력이 취업에 가산된다.', 'good');
       if (p.officer) feed(st, '장교 경력이 취업에 가산된다.', 'good');
@@ -832,7 +916,9 @@ export function stepYear(st: GameState): StepOut {
       const r = ask(st, {
         id: 'biz', title: '창업 제안이 왔다 (종잣돈 500만)',
         options: [
-          { key: 'go', label: '창업한다', sub: '성공률 5%. 성공 시 대박, 실패 시 빚' },
+          { key: 'chick', label: '치킨집 차린다', sub: '성공률 5%' },
+          { key: 'cafe', label: '카페 차린다', sub: '성공률 5%' },
+          { key: 'mall', label: '쇼핑몰 연다', sub: '성공률 5%' },
           { key: 'stay', label: '안정적으로 간다', sub: '현상 유지' },
         ],
       });
@@ -847,7 +933,9 @@ export function stepYear(st: GameState): StepOut {
     const r = ask(st, {
       id: 'partner', title: `${mate}${josa(mate, '이가')} 동업을 제안했다`,
       options: [
-        { key: 'go', label: '같이 한다', sub: '성공률 5%' },
+        { key: 'chick', label: '치킨집 동업', sub: '성공률 5%' },
+        { key: 'cafe', label: '카페 동업', sub: '성공률 5%' },
+        { key: 'mall', label: '쇼핑몰 동업', sub: '성공률 5%' },
         { key: 'no', label: '거절한다', sub: '관계 유지' },
       ],
     });
@@ -859,7 +947,10 @@ export function stepYear(st: GameState): StepOut {
     const r = ask(st, {
       id: 'coin', title: '주변에서 코인으로 돈을 벌었다고 한다',
       options: [
-        { key: 'in', label: '1000만 원을 넣는다', sub: '80% 폭락, 15% +50%, 5% 5배' },
+        { key: 'in100', label: '100만 원을 넣는다', sub: '소액 테스트' },
+        { key: 'in500', label: '500만 원을 넣는다', sub: '80% 폭락, 15% +50%, 5% 5배' },
+        { key: 'in1000', label: '1000만 원을 넣는다', sub: '80% 폭락, 15% +50%, 5% 5배' },
+        { key: 'in3000', label: '3000만 원을 넣는다', sub: '몰빵' },
         { key: 'out', label: '안 한다', sub: '무소식' },
       ],
     });
@@ -867,7 +958,7 @@ export function stepYear(st: GameState): StepOut {
   }
 
   // 연애 시작 (솔로, 22-38세): 소개팅 스펙 공개
-  if (!p.spouse && !p.partner && age >= 22 && age <= 38 && ch(rng, 0.40)) {
+  if (!p.spouse && !p.partner && age >= 22 && age <= 38 && ch(rng, 0.55)) {
     const cand = st.mates.filter((m) => m.alive && m.sex !== p.sex && !m.married && !m.dating);
     const isClass = ch(rng, 0.10) && cand.length > 0;
     const mate = isClass ? cand[Math.floor(rnd(rng) * cand.length) % cand.length] : null;
@@ -889,7 +980,7 @@ export function stepYear(st: GameState): StepOut {
   if (p.partner) {
     if (p.nums['justDated']) p.nums['justDated'] = 0;
     else p.partner.yrs += 1;
-    if (ch(rng, 0.08)) {
+    if (ch(rng, 0.06)) {
       const ex = p.partner;
       if (ex.classmate) {
         const m = st.mates.find((x) => x.name === ex.name);
@@ -951,6 +1042,7 @@ export function stepYear(st: GameState): StepOut {
       const down = Math.round(price * 0.3);
       p.money -= down;
       p.flags['mortgage'] = true;
+      p.nums['mortStart'] = st.age;
       feed(st, `청약 당첨! ${REGIONS[p.liveIdx].name} 자가 마련. 계약금 ${down.toLocaleString()}만 원, 나머지는 주담대.`, 'big');
     } else {
       if (ch(rng, 0.2)) {
@@ -1032,15 +1124,23 @@ function yearlyMoney(st: GameState): void {
     p.peak = Math.max(p.peak, p.salary);
     if (p.job.retire > 0 && st.age >= p.job.retire) {
       p.retired = true;
-      feed(st, `정년퇴직 (${p.job.retire}세).`);
+      const sever = Math.round((p.salary / 12) * Math.min(p.workYrs, 30));
+      p.money += sever;
+      feed(st, `정년퇴직 (${p.job.retire}세). 퇴직금 ${sever.toLocaleString()}만 원.`);
     }
   }
-  if (p.retired) income += p.workYrs * 2 * 12;
+  if (p.retired && st.age >= 65) income += p.workYrs * 2 * 12; // 국민연금은 65세 개시
   if (p.spouse) income += st.age <= 60 ? Math.round(p.spouse.income * 0.5) : 100;
   if (st.age >= 65 && p.kids > 0) income += p.kids * 300;
   if (p.flags['abroad'] && p.job && !p.retired) income += Math.round(p.salary * 0.3);
   const net = afterTax(Math.max(0, income));
   if (st.age < 20) return; // 미성년: 생활비는 부모 부담, 알바 수입(집중효과)은 용돈으로 유지
+  // 실업급여: 실직 후 구직 중 1회 (6개월분 1080만)
+  if (!p.job && p.flags['hunting'] && (p.nums['unempPay'] ?? 0) > 0) {
+    p.nums['unempPay'] = 0;
+    p.money += 1080;
+    feed(st, '실업급여 6개월분 1080만 원을 받았다.', 'good');
+  }
   if (p.carLoan > 0) p.carLoan -= 1;
   const liv = livingCost(st);
   const tut = tutorCost(st);
@@ -1143,7 +1243,16 @@ export function buyLotto(st: GameState): 'win' | 'lose' | 'poor' | 'closed' {
     const gross = rint(st.rng, RATES.lottoMin, RATES.lottoMax);
     const net = Math.round(gross * (1 - RATES.lottoTax));
     p.money += net; p.lottoWon += net; p.peak = Math.max(p.peak, p.salary + net);
+    p.nums['lottoNet'] = net;
     feed(st, `로또 1등. 세후 ${net.toLocaleString()}만 원 수령.`, 'big');
+    st.pending = {
+      id: 'lottowin', title: `당첨금 ${net.toLocaleString()}만 원을 어떻게 할까?`,
+      options: [
+        { key: 'debt', label: '빚부터 갚는다', sub: '마음이 놓인다' },
+        { key: 'save', label: '예금한다', sub: '안전하게' },
+        { key: 'spend', label: '펑펑 쓴다', sub: '3할 증발, 스트레스 해소' },
+      ],
+    };
     return 'win';
   }
   feed(st, '로또 낙첨. 5천 원이 증발했다.');
@@ -1248,30 +1357,32 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
       break;
     }
     case 'layoff':
-      if (key === 'accept') { p.money += p.salary; p.job = null; p.salary = 0; p.flags['jobDone'] = false; feed(st, '위로금을 받고 나왔다. 실직.', 'bad'); }
+      if (key === 'accept') { p.money += p.salary; p.job = null; p.salary = 0; p.flags['jobDone'] = false; p.nums['unempPay'] = 1; feed(st, '위로금을 받고 나왔다. 실직.', 'bad'); }
       else if (ch(rng, 0.5)) feed(st, '버텼다. 자리는 지켰다.', 'good');
-      else { p.job = null; p.salary = 0; p.flags['jobDone'] = false; feed(st, '버티다 잘렸다.', 'bad'); }
+      else { p.job = null; p.salary = 0; p.flags['jobDone'] = false; p.nums['unempPay'] = 1; feed(st, '버티다 잘렸다.', 'bad'); }
       break;
     case 'biz':
     case 'partner': {
-      if (key === 'go') {
+      const item = key === 'chick' ? '치킨집사장' : key === 'cafe' ? '카페사장' : key === 'mall' ? '쇼핑몰운영' : '';
+      if (item) {
         p.money -= RATES.bizSeed;
         if (ch(rng, RATES.bizWin)) {
           p.biz = true;
-          p.job = JOBS.find((j) => j.role === '쇼핑몰운영') ?? p.job;
+          p.job = JOBS.find((j) => j.role === item) ?? p.job;
           p.salary = 15000; p.peak = Math.max(p.peak, 15000);
-          feed(st, '대박. 연 매출이 찍힌다. 전성기 연봉 1.5억.', 'big');
+          feed(st, `대박. ${item} 연 매출이 찍힌다. 전성기 연봉 1.5억.`, 'big');
         } else { p.money -= 2000; feed(st, pick(rng, ['망했다. 빚 2000만 원이 남았다.', '가게 문을 닫았다. 빚 2000만 원.', '동업자와 싸우고 접었다. 빚 2000만 원.'] as const), 'bad'); }
       } else feed(st, id === 'partner' ? '동업 제안을 거절했다. 안정적으로 간다.' : '창업 제안을 거절했다. 안정적으로 간다.');
       break;
     }
-    case 'coin':
-      if (key === 'in') {
-        p.money -= 1000;
+    case 'coin': {
+      const stake = key === 'in100' ? 100 : key === 'in500' ? 500 : key === 'in1000' ? 1000 : key === 'in3000' ? 3000 : 0;
+      if (stake > 0) {
+        p.money -= stake;
         const r = rnd(rng);
-        if (r < 0.8) feed(st, '폭락. 800만 원이 증발했다.', 'bad');
-        else if (r < 0.95) { p.money += 1500; feed(st, '50% 수익. 1500만 원 회수.', 'good'); }
-        else { p.money += 5000; feed(st, '5배. 5000만 원. 전설이 됐다.', 'big'); }
+        if (r < 0.8) { const left = Math.round(stake * 0.2); p.money += left; feed(st, `코인에 넣은 ${stake}만 원이 ${left}만 원이 됐다. -80% 폭락.`, 'bad'); }
+        else if (r < 0.95) { const back = Math.round(stake * 1.5); p.money += back; feed(st, `+50% 수익. ${back}만 원 회수.`, 'good'); }
+        else { const back = stake * 5; p.money += back; feed(st, `5배. ${back.toLocaleString()}만 원. 전설이 됐다.`, 'big'); }
       } else {
         const m = rnd(rng);
         if (m < 0.6) feed(st, '그해 코인 시장은 -63% 폭락했다. 안 하길 잘했다.', undefined, '빗썸 2022 언저리');
@@ -1279,6 +1390,19 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
         else feed(st, '그해 코인 시장은 횡보했다. 무소식.');
       }
       break;
+    }
+    case 'lottowin': {
+      const net = p.nums['lottoNet'] ?? 0;
+      if (key === 'spend') {
+        const use = Math.round(net * 0.3);
+        p.money -= use; p.mental = Math.min(100, p.mental + 10);
+        feed(st, `펑펑 썼다. ${use.toLocaleString()}만 원 증발. 속이 시원하다.`);
+      } else if (key === 'debt') {
+        p.mental = Math.min(100, p.mental + 2);
+        feed(st, p.money < 0 ? '당첨금으로 빚부터 갚았다. 한숨 돌렸다.' : '빚이 없어 예금했다.', 'good');
+      } else feed(st, '당첨금은 예금했다. 통장 숫자가 낯설다.', 'good');
+      break;
+    }
     case 'date': {
       const dc = p.dateCand;
       p.dateCand = null;
@@ -1311,18 +1435,21 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
       if (pt?.classmate) {
         const mate = st.mates.find((x) => x.name === pt.name);
         if (mate) { mate.married = true; mate.spouseClass = true; mate.dating = false; }
-        p.spouse = { name: pt.name, edu: pt.edu, job: pt.job, income: pt.income, classmate: true };
-        feed(st, `같은 반 ${pt.name}${josa(pt.name, '와과')} 결혼했다.`, 'big');
+        const sage = st.age + (p.sex === 'M' ? -3 : 3);
+        p.spouse = { name: pt.name, edu: pt.edu, job: pt.job, income: pt.income, classmate: true, age: sage, marriedAt: st.age };
+        feed(st, `같은 반 ${pt.name}(${p.spouse.age}세)${josa(pt.name, '와과')} 결혼했다.`, 'big');
       } else if (pt) {
-        p.spouse = { name: pt.name, edu: pt.edu, job: pt.job, income: pt.income, classmate: false };
-        feed(st, `${pt.name}${josa(pt.name, '와과')} 결혼했다. (${pt.edu}, ${pt.job}, 연봉 ${pt.income}만)`, 'big');
+        const sage2 = st.age + (p.sex === 'M' ? -3 : 3);
+        p.spouse = { name: pt.name, edu: pt.edu, job: pt.job, income: pt.income, classmate: false, age: sage2, marriedAt: st.age };
+        feed(st, `${pt.name}(${p.spouse.age}세)${josa(pt.name, '와과')} 결혼했다. (${pt.edu}, ${pt.job}, 연봉 ${pt.income}만)`, 'big');
       } else {
-        p.spouse = { name: pick(rng, p.sex === 'M' ? FEMALE : MALE), edu: '대졸', job: '사무직', income: 3000, classmate: false };
+        p.spouse = { name: pick(rng, p.sex === 'M' ? FEMALE : MALE), edu: '대졸', job: '사무직', income: 3000, classmate: false, age: st.age + (p.sex === 'M' ? -3 : 3), marriedAt: st.age };
         feed(st, `${p.spouse.name}${josa(p.spouse.name, '와과')} 결혼했다.`, 'big');
       }
       p.partner = null;
       p.dwelling = '전세';
       p.deposit = Math.round(8000 * REGIONS[p.liveIdx].houseIdx);
+      p.nums['jeonRate'] = 4.0;
       const down2 = Math.round(p.deposit * 0.2);
       p.money -= down2;
       feed(st, `전세 ${p.deposit.toLocaleString()}만 원에 신혼집을 구했다. 계약금 ${down2.toLocaleString()}만 원 + 전세대출. (${REGIONS[p.liveIdx].name})`);
@@ -1331,9 +1458,12 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
     case 'baby':
       if (key === 'yes') {
         p.kids += 1;
+        const g: 'M' | 'F' = ch(rng, 0.514) ? 'M' : 'F';
+        p.children.push(g);
+        const gs = g === 'M' ? '아들' : '딸';
         if (p.kids === 1) p.nums['firstKid'] = st.age;
         p.money -= 300;
-        feed(st, p.kids === 1 ? '첫 아이가 태어났다. 조리원비 300만 원.' : `자녀 ${p.kids}명째. 양육비가 늘었다.`, 'big');
+        feed(st, p.kids === 1 ? `첫 아이가 태어났다. ${gs}이다. 조리원비 300만 원.` : `둘째도 ${gs}이다. 양육비가 늘었다.`, 'big', '통계청 출생성비 2024 (남아 51.4%)');
       } else feed(st, '아이 계획은 미룬다.');
       break;
     case 'car':

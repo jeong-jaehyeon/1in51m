@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   createGame, newSeed, stepYear, resolveChoice, resolveCancer, regionOf, buyLotto, dwellingLabel, autoPickChoice,
+  formatKids, spouseNow, compareStat,
 } from './engine/sim';
 import type { GameState, PendingChoice } from './engine/sim';
 import { drawPortrait } from './engine/portrait';
@@ -282,7 +283,7 @@ function Play(props: {
                     <dt>학력</dt><dd>{p.univName || (p.suneung > 0 ? `수능 ${p.suneung}등급` : st.age >= 19 ? '진학 없음' : '재학 중')}</dd>
                     <dt>직업</dt><dd>{p.job ? (p.jobPlace || jobLabel(p.job)) : st.age >= 22 ? '무직' : '학생'}</dd>
                     <dt>차</dt><dd>{p.car === 'none' ? '없음' : p.car === 'used' ? '중고차' : p.carLoan > 0 ? '신차(할부중)' : '신차'}</dd>
-                    <dt>가족</dt><dd>{p.spouse ? `${p.spouse.name}와 혼인${p.divorced ? '(이혼)' : ''}` : '미혼'} · 자녀 {p.kids}명</dd>
+                    <dt>가족</dt><dd>{p.spouse && !p.divorced ? spouseNow(p, st.age) : p.divorced ? '이혼' : '미혼'} · {formatKids(p)}{(p.nums['grandkids'] ?? 0) > 0 ? ` · 손주 ${p.nums['grandkids']}명` : ''}</dd>
                     <dt>주거</dt><dd>{dwellingLabel(st)}</dd>
                   </dl>
                 </div>
@@ -451,11 +452,12 @@ function End(props: { st: GameState; say: (t: string) => void; onRebirth: () => 
     props.say('이미지를 저장했습니다.');
   };
   const copyText = async () => {
+    const cmp = compareStat(st);
     const t = shareText({
       name: p.name, region: REGIONS[p.regionIdx].name, univ: p.univName || '진학 없음',
       job: p.job ? jobLabel(p.job) : '무직', peak: fmtMan(p.peak),
       deathAge: p.deathAge, cause: p.cause, rank: st.rank, total: st.rankTotal,
-    });
+    }) + `\n수명 상위 ${cmp.life}% · 소득 상위 ${cmp.income}% (추정)`;
     try {
       await navigator.clipboard.writeText(t);
       props.say('결과 텍스트를 복사했습니다.');
@@ -497,9 +499,10 @@ function End(props: { st: GameState; say: (t: string) => void; onRebirth: () => 
             <div><b>{p.univName || (p.suneung > 0 ? `수능 ${p.suneung}등급` : '진학 없음')}</b><small>학력</small></div>
             <div><b>{p.job ? (p.jobPlace || jobLabel(p.job)) : '무직'}</b><small>직업</small></div>
             <div><b>{fmtMan(p.peak)}</b><small>전성기 연봉{p.lottoWon > 0 ? ` (로또 ${fmtMan(p.lottoWon)} 포함)` : ''}</small></div>
-            <div><b>{p.spouse ? `기혼${p.divorced ? '(이혼)' : ''} · 자녀 ${p.kids}명` : '미혼'}</b><small>가족</small></div>
+            <div><b>{p.spouse && !p.divorced ? spouseNow(p, st.age) : p.divorced ? '이혼' : '미혼'} · {formatKids(p)}{(p.nums['grandkids'] ?? 0) > 0 ? ` · 손주 ${p.nums['grandkids']}명` : ''}</b><small>가족</small></div>
             <div><b>{dwellingLabel(st)}</b><small>주거</small></div>
             <div><b>11명 중 {st.rank}등</b><small>같은 반 종합 순위 (수능3:대학3:소득4)</small></div>
+            <div><b>수명 상위 {compareStat(st).life}% · 소득 상위 {compareStat(st).income}%</b><small>전국 비교 (소득은 추정치)</small></div>
           </div>
           {journals.length > 0 && (
             <div className="paper2">
