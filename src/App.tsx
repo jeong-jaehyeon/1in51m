@@ -296,7 +296,7 @@ function Play(props: {
             </div>
             <div className="panel">
               <h3>상태</h3>
-              <Stat label="성적" v={p.grade} />
+              <Stat label={st.age < 25 ? '성적' : '지식'} v={p.grade} />
               <Stat label="건강" v={p.health} />
               <Stat label="멘탈" v={p.mental} />
               <Stat label="인맥" v={p.network} />

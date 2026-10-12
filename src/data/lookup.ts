@@ -107,7 +107,7 @@ export const RATES = {
   cancerDx: 0.003, // 40+
   dementia: 0.10, // 75+
   lonelyPlus: 0.03, // solitary 65+
-  bankruptX: 3, // debt > 3x income
+  bankruptX: 4, // debt > 4x income
   tutorBase: 12, // 만원/month base x region tutorIdx x quintile
   loanTable: { med: 4500, sk: 3000, seoul: 3000, jgeo: 2200, jun: 1800, hs: 1200 } as Record<string, number>,
 } as const;
