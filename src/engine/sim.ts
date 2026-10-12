@@ -370,7 +370,7 @@ const PHASE_FLAVOR: FEntry[] = [
   { a: 1, b: 6, age: [1, 2], lines: ['이앓이를 한다. 밤에 세 번 깬다.'] },
   { a: 1, b: 6, age: [1, 1], lines: ['첫돌. 돌잡이에서 {pickJ} 잡았다.'] },
   { a: 1, b: 6, age: [1, 2], lines: ['말문이 트였다. “엄마”가 먼저다.'] },
-  { a: 1, b: 6, age: [2, 6], lines: ['어린이집 대기번호가 {n}번이다.'] },
+  { a: 1, b: 6, age: [2, 6], lines: ['어린이집 대기번호가 {wn}번이다.'] },
   { a: 1, b: 6, age: [1, 5], lines: ['예방접종 날. 엉엉 울었다가 사탕 하나로 그쳤다.'] },
   { a: 7, b: 12, lines: ['받아쓰기 100점. 냉장고에 붙었다.', '운동회 계주에서 넘어졌다. 무릎이 까졌다.', '같은 반 {mWa} 절교했다가 다음 날 화해했다.', '학원 셔틀버스에서 꾸벅 졸았다.', '생일 파티에 {mGa} 왔다.'] },
   { a: 13, b: 15, lines: ['사춘기. 방문을 닫고 산다.', '첫 시험에서 반 평균을 넘겼다.', '좋아하는 연예인 사진을 책상에 붙였다.', '{mWa} 같은 고등학교를 가고 싶다고 했다.', '밤 12시, 수학 오답노트를 펼쳤다.'] },
@@ -379,22 +379,23 @@ const PHASE_FLAVOR: FEntry[] = [
   { a: 20, b: 29, if: huntReady, lines: ['취업 포털에 이력서를 올렸다. 서류만 {n}번째다.'] },
   { a: 20, b: 29, if: (st) => huntReady(st) && !st.player.flags['certDone'], lines: ['취업을 위해 컴활 1급 시험을 봤다.', '컴활 실기에서 {certR}. 취업용인데.', '한국사 1급을 땄다. 공무원 가산점용이다.'] },
   { a: 20, b: 29, if: (st) => hasJob(st) && st.player.workYrs <= 1, lines: ['첫 월급날. 통장을 세 번 확인했다. 세후 {pay}만원이 찍혔다. 너무 좋아서.'] },
-  { a: 20, b: 29, if: (st) => hasJob(st) && st.player.salary > 0 && st.player.salary < 3000, lines: ['월급날. 통장을 세 번 확인했다. 너무 적어서.'] },
+  { a: 20, b: 29, if: (st) => hasJob(st) && st.player.salary > 0 && st.player.salary < 3000, lines: ['월급날. 통장을 세 번 확인했다. 너무 적어서.', '월급명세서를 봤다. 한숨이 나왔다.'] },
   { a: 30, b: 30, if: (st) => !!st.player.flags['firstloveFail'] && !st.player.flags['flDone'], lines: ['첫사랑 생각이 났다.'] },
   { a: 30, b: 49, if: (st) => kidAge(st) >= 6 && kidAge(st) <= 18, lines: ['아이 운동회 날 반차를 썼다.', '아이 학원비 고지서가 왔다.'] },
-  { a: 30, b: 49, lines: ['건강검진에서 콜레스테롤 경고를 받았다.'] },
+  { a: 30, b: 49, lines: ['건강검진에서 콜레스테롤 경고를 받았다.', '중성지방 수치가 높다고 한다.', '혈당 경계란다. 단 걸 줄이란다.', '간 수치가 안 좋다고 한다.'] },
   { a: 30, b: 49, if: (st) => !st.player.flags['bpMed'], lines: ['혈압약을 먹기 시작했다.'] },
   { a: 30, b: 49, if: (st) => !st.player.flags['golf'], lines: ['골프를 배웠다.'] },
   { a: 30, b: 64, if: (st) => hasJob(st) && st.age % 10 === 0, lines: ['연봉 {payY}만. 10년 전보다 {pct}% 올랐다.', '연봉이 10년째 제자리다. 답답하다.'] },
   { a: 30, b: 49, if: (st) => st.player.parentsAlive && st.player.money > 0, lines: ['부모님께 용돈을 보내드렸다.'] },
-  { a: 30, b: 49, if: hasJob, lines: ['회식 2차에서 노래를 불렀다.'] },
+  { a: 30, b: 49, if: hasJob, lines: ['회식 2차에서 노래를 불렀다.', '회식에서 고기를 구웠다.', '야유회에 갔다.'] },
   { a: 45, b: 60, if: (st) => kidAge(st) >= 19 && kidAge(st) <= 28, lines: ['자녀 등록금 고지서가 왔다.'] },
   { a: 50, b: 64, if: hasJob, lines: ['후배가 팀장이 됐다.'] },
-  { a: 50, b: 64, if: (st) => st.mates.length > 0, lines: ['동창회에 나갔다. 반은 약을 먹는다고 했다.'] },
-  { a: 50, b: 64, lines: ['무릎이 시큰거린다.', '정년 후 뭘 할지 고민한다.'] },
+  { a: 50, b: 64, if: (st) => st.mates.length > 0, lines: ['동창회에 나갔다. 반은 약을 먹는다고 했다.', '동창회에서 옛날 이야기로 밤을 새웠다.'] },
+  { a: 50, b: 64, lines: ['무릎이 시큰거린다.', '허리가 뻐근하다.', '어깨가 결린다.'] },
+  { a: 50, b: 64, if: (st) => !st.player.flags['retThink'], lines: ['정년 후 뭘 할지 고민한다.'] },
   { a: 50, b: 64, if: (st) => !st.player.flags['cataract'], lines: ['백내장이 왔다.'] },
-  { a: 65, b: 200, if: (st) => kidAge(st) >= 27, lines: ['손주 사진을 받았다.'] },
-  { a: 65, b: 200, lines: ['공원에서 바둑을 뒀다.', '병원 정기검진 날이다.', '옛날 노래를 흥얼거렸다.', '경로당에 나간다.', '고혈압 약을 먹는다.', '옛 친구를 장례식에서 만났다.', '텃밭을 가꾼다.'] },
+  { a: 65, b: 200, if: (st) => kidAge(st) >= 27, lines: ['손주 사진을 받았다.', '손주 영상을 받았다.'] },
+  { a: 65, b: 200, lines: ['공원에서 바둑을 뒀다.', '병원 정기검진 날이다.', '옛날 노래를 흥얼거렸다.', '경로당에 나간다.', '고혈압 약을 먹는다.', '옛 친구를 장례식에서 만났다.', '텃밭을 가꾼다.', '장기를 뒀다.', '산책을 나갔다.'] },
   { a: 65, b: 200, if: (st) => !st.player.flags['denture'], lines: ['틀니를 맞췄다.'] },
 ];
 
@@ -422,9 +423,11 @@ function flavor(st: GameState): void {
   if (st.player.nums['dday'] === undefined) st.player.nums['dday'] = rint(st.rng, 280, 365);
   const dday = Math.max(1, st.player.nums['dday'] ?? 1);
   const gift = pick(st.rng, [5, 10, 10, 20, 30] as const);
+  const wn = rint(st.rng, 1, 15);
   const pk = pick(st.rng, ['공', '마이크', '청진기', '돈'] as const);
   t = t.replace('{mWa}', mWa).replace('{mGa}', mGa)
     .replace('{gift}', String(gift))
+    .replace('{wn}', String(wn))
     .replace('{pickJ}', pk + josa(pk, '을를'))
     .replace('{pick}', pk)
     .replace('{n}', String(n + 1))
@@ -442,7 +445,7 @@ function flavor(st: GameState): void {
   if (t.includes('축의금')) { st.player.money -= gift; st.player.nums['giftN'] = (st.player.nums['giftN'] ?? 0) + 1; }
   if (t.includes('D-')) st.player.nums['dday'] = Math.max(1, dday - rint(st.rng, 150, 200));
   if (t.includes('컴활') || t.includes('한국사')) st.player.flags['certDone'] = true;
-  if (t.includes('첫사랑 생각')) st.player.flags['flDone'] = true;
+  if (t.includes('정년 후 뭘 할지')) st.player.flags['retThink'] = true;
   st.player.lastFlavor = t;
   feed(st, t);
 }
@@ -1241,7 +1244,7 @@ export function stepYear(st: GameState): StepOut {
         ],
       });
       if (r) return r;
-    } else if (ch(rng, 0.5)) feed(st, '설에 떡국을 먹었다.');
+    } else if (ch(rng, 0.5)) feed(st, pick(rng, ['설에 떡국을 먹었다.', '설날에 전을 부쳤다.', '차례는 영상통화로 지냈다.'] as const));
   }
 
   // 전세사기 (전세 거주 중 연 2%, 1회)
@@ -1280,8 +1283,9 @@ export function stepYear(st: GameState): StepOut {
     if (r) return r;
   }
 
-  // 야근 (재직 중, 연 30%)
-  if (p.job && !p.retired && ch(rng, 0.3)) {
+  // 야근 (재직 중, 연 30%, 3년 쿨다운)
+  if (p.job && !p.retired && (p.nums['otCool'] ?? -99) + 3 <= age && ch(rng, 0.3)) {
+    p.nums['otCool'] = age;
     const r = ask(st, {
       id: 'overtime', title: '야근 제안이 왔다',
       options: [
@@ -1294,7 +1298,7 @@ export function stepYear(st: GameState): StepOut {
 
   // 보이스피싱 (30세+, 연 3%. 지식 70+면 자동 회피)
   if (age >= 30 && ch(rng, 0.03)) {
-    if (p.grade >= 70) feed(st, '“딸이 납치됐다”는 전화를 받았다. 수상해서 끊었다.', 'good');
+    if (p.grade >= 70) feed(st, pick(rng, ['“딸이 납치됐다”는 전화를 받았다. 수상해서 끊었다.', '“검찰청” 사칭 전화를 받고 끊었다.', '“택배” 문자 링크가 이상해서 지웠다.'] as const), 'good');
     else {
       const r = ask(st, {
         id: 'phishing', title: '“자녀가 납치됐다. 돈을 보내라”는 전화',
@@ -1854,7 +1858,7 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
           };
           return;
         }
-      } else feed(st, '아이 계획은 미룬다.');
+      } else feed(st, pick(rng, ['아이 계획은 미룬다.', '둘째는 나중에 생각한다.', '지금은 때가 아니다.'] as const));
       break;
     case 'car':
       if (key === 'used') { p.car = 'used'; p.money -= 800; feed(st, '중고차를 샀다. 800만 원. 유지비 연 250만 원.'); }
@@ -1927,7 +1931,7 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
       if (amt > 0) {
         p.money -= amt;
         p.mental = Math.min(100, p.mental + (key === 'a10' ? 1 : key === 'a30' ? 2 : 3));
-        feed(st, `부모님께 연 ${amt}만 원 부쳤다.`);
+        feed(st, pick(rng, [`부모님께 연 ${amt}만 원 부쳤다.`, `용돈 ${amt}만 원을 보내드렸다.`] as const));
       } else {
         p.mental = Math.max(0, p.mental - 1);
         feed(st, '용돈을 못 드렸다. 마음에 걸린다.');
@@ -1950,10 +1954,10 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
       if (key === 'go') {
         p.money -= 30;
         p.mental = Math.min(100, p.mental + 3);
-        feed(st, '고향에 다녀왔다. 떡국을 먹었다.', 'good');
+        feed(st, pick(rng, ['고향에 다녀왔다. 떡국을 먹었다.', '본가에 다녀왔다. 어머니 음식을 먹었다.', '고향 친구들을 만났다.'] as const), 'good');
       } else {
         p.mental = Math.max(0, p.mental - 1);
-        feed(st, '설을 혼자 보냈다.');
+        feed(st, pick(rng, ['설을 혼자 보냈다.', '명절인데 약속이 없다.', '고향 소식이 궁금하다.'] as const));
       }
       break;
     case 'stock': {
@@ -1983,7 +1987,7 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
         if ((p.nums['otStreak'] ?? 0) >= 3 && ch(rng, 0.005)) { die(st, '과로사'); return; }
       } else {
         p.nums['otStreak'] = 0;
-        feed(st, '칼퇴했다. 저녁이 있다.');
+        feed(st, pick(rng, ['칼퇴했다. 저녁이 있다.', '정시퇴근했다.', '오늘은 일찍 나왔다.'] as const));
       }
       break;
     case 'phishing':
@@ -2008,10 +2012,10 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
       if (key === 'yes') {
         p.money -= 10;
         p.network = Math.min(100, p.network + 2);
-        feed(st, '결혼식에 다녀왔다. 축의금 10만 원.', 'good');
+        feed(st, pick(rng, ['결혼식에 다녀왔다. 축의금 10만 원.', '축의금 내고 사진만 찍고 왔다.'] as const), 'good');
       } else {
         p.network = Math.max(0, p.network - 1);
-        feed(st, '결혼식에 못 갔다. 서먹해졌다.');
+        feed(st, pick(rng, ['결혼식에 못 갔다. 서먹해졌다.', '청첩장을 받고도 못 갔다.'] as const));
       }
       break;
     case 'guar':
