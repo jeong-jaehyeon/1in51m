@@ -33,7 +33,15 @@ export function loadGame(): GameState | null {
     if (pl['autoLotto'] === undefined) pl['autoLotto'] = false;
     if (pl['lastFlavor'] === undefined) pl['lastFlavor'] = '';
     if (pl['partner'] === undefined) pl['partner'] = null;
+    else if (pl['partner']) {
+      const pt = pl['partner'] as Record<string, unknown>;
+      if (pt['edu'] === undefined) { pt['edu'] = '대졸'; pt['job'] = '직장인'; pt['income'] = 3000; }
+    }
     if (pl['dateCand'] === undefined) pl['dateCand'] = null;
+    else if (pl['dateCand']) {
+      const dc = pl['dateCand'] as Record<string, unknown>;
+      if (dc['edu'] === undefined) { dc['edu'] = '대졸'; dc['job'] = '직장인'; dc['income'] = 3000; }
+    }
     if (pl['nums'] === undefined) pl['nums'] = {};
     if (pl['baseGrade'] === undefined) pl['baseGrade'] = (o.player as GameState['player']).grade;
     if (pl['studyYrs'] === undefined) pl['studyYrs'] = 0;
