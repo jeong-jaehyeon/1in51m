@@ -349,25 +349,35 @@ const PHASE_FLAVOR: FEntry[] = [
   { a: 20, b: 29, if: (st) => hasJob(st) && st.player.salary > 0 && st.player.salary < 3000, lines: ['월급날. 통장을 세 번 확인했다. 너무 적어서.'] },
   { a: 20, b: 29, if: (st) => hasJob(st) || st.age >= 25, lines: ['친구 결혼식에 축의금 {gift}만 원을 냈다.'] },
   { a: 30, b: 49, if: (st) => kidAge(st) >= 6 && kidAge(st) <= 18, lines: ['아이 운동회 날 반차를 썼다.', '아이 학원비 고지서가 왔다.'] },
-  { a: 30, b: 49, lines: ['건강검진에서 콜레스테롤 경고를 받았다.', '혈압약을 먹기 시작했다.', '골프를 배웠다.'] },
-  { a: 30, b: 64, if: (st) => hasJob(st) && st.age % 10 === 0, lines: ['연봉 {payY}만. 10년 전보다 {pct}% 올랐다.'] },
+  { a: 30, b: 49, lines: ['건강검진에서 콜레스테롤 경고를 받았다.'] },
+  { a: 30, b: 49, if: (st) => !st.player.flags['bpMed'], lines: ['혈압약을 먹기 시작했다.'] },
+  { a: 30, b: 49, if: (st) => !st.player.flags['golf'], lines: ['골프를 배웠다.'] },
+  { a: 30, b: 64, if: (st) => hasJob(st) && st.age % 10 === 0, lines: ['연봉 {payY}만. 10년 전보다 {pct}% 올랐다.', '연봉이 10년째 제자리다. 답답하다.'] },
   { a: 30, b: 49, if: (st) => st.player.parentsAlive && st.player.money > 0, lines: ['부모님께 용돈을 보내드렸다.'] },
   { a: 30, b: 49, if: hasJob, lines: ['회식 2차에서 노래를 불렀다.'] },
   { a: 45, b: 60, if: (st) => kidAge(st) >= 19 && kidAge(st) <= 28, lines: ['자녀 등록금 고지서가 왔다.'] },
   { a: 50, b: 64, if: hasJob, lines: ['후배가 팀장이 됐다.'] },
   { a: 50, b: 64, if: (st) => st.mates.length > 0, lines: ['동창회에 나갔다. 반은 약을 먹는다고 했다.'] },
-  { a: 50, b: 64, lines: ['무릎이 시큰거린다.', '백내장이 왔다.', '정년 후 뭘 할지 고민한다.', '혈압약을 먹기 시작했다.'] },
+  { a: 50, b: 64, lines: ['무릎이 시큰거린다.', '정년 후 뭘 할지 고민한다.'] },
+  { a: 50, b: 64, if: (st) => !st.player.flags['cataract'], lines: ['백내장이 왔다.'] },
   { a: 65, b: 200, if: (st) => kidAge(st) >= 27, lines: ['손주 사진을 받았다.'] },
-  { a: 65, b: 200, lines: ['공원에서 바둑을 뒀다.', '병원 정기검진 날이다.', '옛날 노래를 흥얼거렸다.', '경로당에 나간다.', '틀니를 맞췄다.', '고혈압 약을 먹는다.', '옛 친구를 장례식에서 만났다.', '텃밭을 가꾼다.'] },
+  { a: 65, b: 200, lines: ['공원에서 바둑을 뒀다.', '병원 정기검진 날이다.', '옛날 노래를 흥얼거렸다.', '경로당에 나간다.', '고혈압 약을 먹는다.', '옛 친구를 장례식에서 만났다.', '텃밭을 가꾼다.'] },
+  { a: 65, b: 200, if: (st) => !st.player.flags['denture'], lines: ['틀니를 맞췄다.'] },
 ];
 
 function flavor(st: GameState): void {
+  const prevSal = st.player.nums['sal10'] ?? st.player.salary;
+  const pct = prevSal > 0 ? Math.round((st.player.salary / prevSal - 1) * 100) : 0;
   const pool: string[] = [];
   for (const e of PHASE_FLAVOR) {
     if (st.age < e.a || st.age > e.b) continue;
     if (e.age && (st.age < e.age[0] || st.age > e.age[1])) continue;
     if (e.if && !e.if(st)) continue;
-    pool.push(...e.lines);
+    for (const ln of e.lines) {
+      if (ln.includes('10년 전보다') && pct <= 0) continue;
+      if (ln.includes('제자리다') && pct > 0) continue;
+      pool.push(ln);
+    }
   }
   if (pool.length === 0 || !ch(st.rng, 0.7)) return;
   const cands = pool.length > 1 ? pool.filter((t) => t !== st.player.lastFlavor) : pool;
@@ -379,8 +389,6 @@ function flavor(st: GameState): void {
   if (st.player.nums['dday'] === undefined) st.player.nums['dday'] = rint(st.rng, 280, 365);
   const dday = Math.max(1, st.player.nums['dday'] ?? 1);
   const gift = pick(st.rng, [5, 10, 10, 20, 30] as const);
-  const prevSal = st.player.nums['sal10'] ?? st.player.salary;
-  const pct = prevSal > 0 ? Math.round((st.player.salary / prevSal - 1) * 100) : 0;
   const pk = pick(st.rng, ['공', '마이크', '청진기', '돈'] as const);
   t = t.replace('{mWa}', mWa).replace('{mGa}', mGa)
     .replace('{gift}', String(gift))
@@ -394,6 +402,10 @@ function flavor(st: GameState): void {
     .replace('{pct}', String(pct));
   if (t.includes('10년 전보다')) st.player.nums['sal10'] = st.player.salary;
   if (t.includes('이력서')) st.player.nums['apps'] = n + 1;
+  if (t.includes('혈압약')) st.player.flags['bpMed'] = true;
+  if (t.includes('골프를 배웠다')) st.player.flags['golf'] = true;
+  if (t.includes('백내장')) st.player.flags['cataract'] = true;
+  if (t.includes('틀니')) st.player.flags['denture'] = true;
   if (t.includes('축의금')) st.player.money -= gift;
   if (t.includes('D-')) st.player.nums['dday'] = Math.max(1, dday - rint(st.rng, 150, 200));
   if (t.includes('컴활') || t.includes('한국사')) st.player.flags['certDone'] = true;
@@ -653,7 +665,13 @@ export function stepYear(st: GameState): StepOut {
     const r0 = p.nums['jeonRate'] ?? 4.0;
     const r1 = Math.max(2, Math.min(7, r0 + pick(rng, [-0.5, 0, 0, 0.5] as const)));
     p.nums['jeonRate'] = Math.round(r1 * 100) / 100;
-    if (Math.abs(r1 - r0) >= 0.5 && ch(rng, 0.3)) feed(st, `전세대출 금리가 연 ${r1.toFixed(2)}%로 ${r1 > r0 ? '올랐다' : '내렸다'}.`);
+    const hi = p.nums['jeonHi'] ?? 4.0;
+    const lo = p.nums['jeonLo'] ?? 4.0;
+    if (r1 > hi || r1 < lo) {
+      p.nums['jeonHi'] = Math.max(hi, r1);
+      p.nums['jeonLo'] = Math.min(lo, r1);
+      feed(st, `전세대출 금리가 연 ${r1.toFixed(2)}%로 ${r1 > r0 ? '올랐다' : '내렸다'}. ${r1 > r0 ? '이자 부담이 커졌다' : '숨통이 트였다'}.`);
+    }
   }
   if (p.flags['mortgage'] && (p.nums['mortStart'] ?? st.age) + 20 <= st.age) {
     p.flags['mortgage'] = false;
@@ -689,6 +707,7 @@ export function stepYear(st: GameState): StepOut {
   }
   if (age >= 40 && !p.cancer && ch(rng, RATES.cancerDx)) {
     p.cancer = true;
+    feed(st, '건강검진에서 암 진단을 받았다.', 'bad');
     const rc = ask(st, {
       id: 'cancer', title: '암 진단을 받았다',
       options: [
@@ -771,8 +790,9 @@ export function stepYear(st: GameState): StepOut {
   }
 
   if (age === 18) {
-    const band = Math.max(1, Math.min(9, gradeBand(p.grade) + (ch(rng, RATES.conditionP) ? (ch(rng, 0.5) ? -1 : 1) : 0)));
-    if (band !== gradeBand(p.grade)) feed(st, `수능 당일 컨디션 ${band < gradeBand(p.grade) ? '최상' : '난조'}.`);
+    const orig = gradeBand(p.grade);
+    const band = Math.max(1, Math.min(9, orig + (ch(rng, RATES.conditionP) ? (ch(rng, 0.5) ? -1 : 1) : 0)));
+    if (band !== orig) feed(st, band < orig ? `수능 당일 컨디션 최상. ${orig}등급 나올 뻔한 걸 ${band}등급으로 막았다.` : `수능 당일 컨디션 난조. ${orig}등급 받을 실력에 ${band}등급.`);
     p.suneung = band;
     feed(st, `수능 ${band}등급.`, 'big', '한국교육과정평가원');
     const r = ask(st, {
@@ -862,7 +882,7 @@ export function stepYear(st: GameState): StepOut {
     }
   }
   if ((p.sex === 'F' || p.service === 'exempt' || p.service === 'none') && (age === 20 || age === 21)) {
-    feed(st, pick(rng, ['토익 학원에 등록했다.', '편의점 야간 알바를 시작했다.', '자격증 2개를 땄다.', '배낭여행을 다녀왔다.'] as const));
+    feed(st, pick(rng, ['토익 학원에 등록했다.', '편의점 야간 알바를 시작했다.', '자격증 2개를 땄다.', '배낭여행을 다녀왔다.', '운전면허를 땄다.', '워킹홀리데이를 알아봤다.'] as const));
   }
 
   // first job & re-employment via interview chain (실명 조직 + 사유 명시)
@@ -892,12 +912,13 @@ export function stepYear(st: GameState): StepOut {
     if (r) return r;
   }
 
-  // 이직 (30·42세 창구, 연봉 상승 제안이 올 때만)
-  if (p.job && !p.retired && ((age >= 30 && !p.flags['chg1']) || (age >= 42 && !p.flags['chg2'])) && ch(rng, 0.25)) {
+  // 이직 (30·42세 창구, 연봉 상승 제안이 올 때만. 창업 성공 후·스펙 미달 제외)
+  if (p.job && !p.retired && !p.biz && ((age >= 30 && !p.flags['chg1']) || (age >= 42 && !p.flags['chg2'])) && ch(rng, 0.25)) {
     const tier = p.edu === 'none' ? 'hs' : p.edu === 'med' ? 'med' : p.edu;
     const nj = drawJob(st, tier, 0.1);
     p.flags[age >= 42 ? 'chg2' : 'chg1'] = true;
-    if (nj && nj.base > p.job.base * 1.05) {
+    const need = MINGRADE[nj?.tier ?? ''] ?? 0;
+    if (nj && nj.base * 1.2 > p.salary && p.grade >= need - 10) {
       p.nums['chgJob'] = JOBS.indexOf(nj);
       const r = ask(st, {
         id: 'change', title: `${jobPlace(nj, REGIONS[p.liveIdx])}에서 스카우트 제의`, fact: `제시 연봉 ${Math.round(nj.base).toLocaleString()}만 (현 ${Math.round(p.job.base).toLocaleString()}만)`,
@@ -942,7 +963,7 @@ export function stepYear(st: GameState): StepOut {
     if (r) return r;
   }
 
-  if (age >= 25 && age <= 40 && !p.flags['coin']) {
+  if (age >= 25 && age <= 35 && !p.flags['coin'] && ch(rng, 0.5)) {
     p.flags['coin'] = true;
     const r = ask(st, {
       id: 'coin', title: '주변에서 코인으로 돈을 벌었다고 한다',
@@ -957,7 +978,7 @@ export function stepYear(st: GameState): StepOut {
     if (r) return r;
   }
 
-  // 연애 시작 (솔로, 22-38세): 소개팅 스펙 공개
+  // 연애 시작 (솔로, 22-38세): 소개팅 스펙 공개. 해외 체류 중에도 가능
   if (!p.spouse && !p.partner && age >= 22 && age <= 38 && ch(rng, 0.55)) {
     const cand = st.mates.filter((m) => m.alive && m.sex !== p.sex && !m.married && !m.dating);
     const isClass = ch(rng, 0.10) && cand.length > 0;
@@ -966,8 +987,9 @@ export function stepYear(st: GameState): StepOut {
     const job = mate ? (mate.job || '취준생') : pick(rng, ['사무직', '간호사', '교사', '개발자', '자영업', '공무원'] as const);
     const income = mate ? Math.max(2000, mate.peak) : rint(rng, 2200, 4200);
     p.dateCand = { name: mate ? mate.name : pick(rng, p.sex === 'M' ? FEMALE : MALE), classmate: isClass, yrs: 0, edu, job, income };
+    const dcName = p.dateCand.name;
     const r = ask(st, {
-      id: 'date', title: `${p.dateCand.name}${josa(p.dateCand.name, '와과')} 썸 시작 (${edu}·${job})`,
+      id: 'date', title: isClass ? `같은 반 ${dcName}(${edu}·${job})${josa(dcName, '와과')} 썸 시작` : `${dcName}${josa(dcName, '와과')} 썸 시작 (${edu}·${job})`,
       options: [
         { key: 'yes', label: '사귄다', sub: '교제 시작' },
         { key: 'no', label: '그만둔다', sub: '솔로 유지' },
@@ -976,10 +998,11 @@ export function stepYear(st: GameState): StepOut {
     if (r) return r;
   }
 
-  // 교제 중: 매년 1년씩, 이별 8%, 2년차부터 결혼 선택
+  // 교제 중: 매년 1년씩, 이별 6%, 2년차부터 결혼 선택 (형성 틱은 통째로 스킵)
   if (p.partner) {
-    if (p.nums['justDated']) p.nums['justDated'] = 0;
-    else p.partner.yrs += 1;
+    if (p.nums['justDated']) { p.nums['justDated'] = 0; }
+    else {
+    p.partner.yrs += 1;
     if (ch(rng, 0.06)) {
       const ex = p.partner;
       if (ex.classmate) {
@@ -1001,6 +1024,7 @@ export function stepYear(st: GameState): StepOut {
       if (r) return r;
     } else if (ch(rng, 0.3)) {
       feed(st, pick(rng, [`${p.partner.name}${josa(p.partner.name, '와과')} 한강 데이트.`, `${p.partner.name}${josa(p.partner.name, '와과')} 크게 싸웠다. 화해했다.`, `${p.partner.name} 부모님께 인사드렸다.`] as const));
+    }
     }
   }
 
@@ -1032,8 +1056,8 @@ export function stepYear(st: GameState): StepOut {
     if (r0) return r0;
   }
 
-  // 청약: 기혼무주택 자동 시도 (당첨 7%, 탈락하면 전세 루프)
-  if (p.spouse && p.dwelling !== '자가' && age >= 30) {
+  // 청약: 기혼무주택 자동 시도 (당첨 7%, 탈락하면 전세 루프. 해외 체류 중 제외)
+  if (p.spouse && p.dwelling !== '자가' && age >= 30 && !p.flags['abroad']) {
     p.nums['cheongFails'] = p.nums['cheongFails'] ?? 0;
     if (ch(rng, RATES.cheongyakWin)) {
       p.dwelling = '자가';
@@ -1052,8 +1076,8 @@ export function stepYear(st: GameState): StepOut {
     }
   }
 
-  // 해외이주: 25-40세 1회 도전 (성공 30%), 40-55세 귀국 선택
-  if (age >= 25 && age <= 40 && !p.flags['emig'] && !p.flags['abroad']) {
+  // 해외이주: 25-40세, 연 30%로 기회 (매년 고정 아님)
+  if (age >= 25 && age <= 40 && !p.flags['emig'] && !p.flags['abroad'] && ch(rng, 0.3)) {
     p.flags['emig'] = true;
     const r = ask(st, {
       id: 'emig', title: '해외 취업이민 기회가 왔다',
@@ -1118,7 +1142,8 @@ function yearlyMoney(st: GameState): void {
   const p = st.player;
   let income = 0;
   if (p.job && !p.retired) {
-    p.salary = Math.round(p.salary * (1 + p.job.raise));
+    if (st.age < 60) p.salary = Math.round(p.salary * (1 + p.job.raise));
+    else if (st.age >= 70) p.salary = Math.round(p.salary * 0.99);
     p.workYrs += 1;
     income += p.salary;
     p.peak = Math.max(p.peak, p.salary);
@@ -1159,7 +1184,9 @@ function yearlyMoney(st: GameState): void {
   p.nums['lastOut'] = Math.round(consume);
   if (p.car !== 'none' && income > 0) {
     const burden = (p.car === 'new' ? 360 : 250) + (p.carLoan > 0 ? 500 : 0);
-    if (burden > income * 0.3 && ch(st.rng, 0.3)) {
+    const last = p.nums['carpoorAt'] ?? -99;
+    if (burden > income * 0.3 && st.age - last >= 5 && ch(st.rng, 0.3)) {
+      p.nums['carpoorAt'] = st.age;
       p.mental = Math.max(0, p.mental - 3);
       feed(st, '카푸어다. 차 유지비가 소득의 30%를 넘는다.', 'bad');
     }
@@ -1371,7 +1398,12 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
           p.job = JOBS.find((j) => j.role === item) ?? p.job;
           p.salary = 15000; p.peak = Math.max(p.peak, 15000);
           feed(st, `대박. ${item} 연 매출이 찍힌다. 전성기 연봉 1.5억.`, 'big');
-        } else { p.money -= 2000; feed(st, pick(rng, ['망했다. 빚 2000만 원이 남았다.', '가게 문을 닫았다. 빚 2000만 원.', '동업자와 싸우고 접었다. 빚 2000만 원.'] as const), 'bad'); }
+        } else {
+          p.money -= 2000;
+          feed(st, id === 'partner'
+            ? pick(rng, ['동업자와 싸우고 접었다. 빚 2000만 원.', '동업이 깨졌다. 빚 2000만 원.'] as const)
+            : pick(rng, ['망했다. 빚 2000만 원이 남았다.', '가게 문을 닫았다. 빚 2000만 원.', '폐업했다. 빚 2000만 원.'] as const), 'bad');
+        }
       } else feed(st, id === 'partner' ? '동업 제안을 거절했다. 안정적으로 간다.' : '창업 제안을 거절했다. 안정적으로 간다.');
       break;
     }
@@ -1413,7 +1445,7 @@ export function resolveChoice(st: GameState, id: string, key: string): void {
         if (dc.classmate) {
           const m = st.mates.find((x) => x.name === dc.name);
           if (m) m.dating = true;
-          feed(st, `같은 반 ${dc.name}${josa(dc.name, '와과')} 사귀기 시작했다.`, 'big');
+          feed(st, `같은 반 ${dc.name}(${dc.edu}·${dc.job})${josa(dc.name, '와과')} 사귀기 시작했다.`, 'big');
         } else feed(st, `${dc.name}${josa(dc.name, '와과')} 사귀기 시작했다. (${dc.edu}·${dc.job})`, 'big');
       } else feed(st, pick(rng, ['썸은 썸으로 끝났다.', '연락이 뜸해졌다. 자연스럽게 멀어졌다.', '고백 타이밍을 놓쳤다.'] as const));
       break;
