@@ -4,22 +4,39 @@
 export interface Region {
   id: string;
   name: string;
-  birthW: number; // share of annual births (2024 추계 근사)
-  costIdx: number; // living-cost multiplier
-  tutorIdx: number; // private-education multiplier
-  houseIdx: number; // housing price multiplier (self-owned home target)
+  city: string; // 대표 도시 (소방서·학교 등 실명 표기용)
+  birthW: number; // 연간 출생아 비중 (2024 추계 근사)
+  costIdx: number;
+  tutorIdx: number;
+  houseIdx: number;
 }
 
 export const REGIONS: Region[] = [
-  { id: 'gangnam', name: '서울 강남3구', birthW: 5, costIdx: 1.45, tutorIdx: 2.1, houseIdx: 3.2 },
-  { id: 'seoulN', name: '서울 강북·기타', birthW: 8, costIdx: 1.2, tutorIdx: 1.4, houseIdx: 2.0 },
-  { id: 'gyeongS', name: '경기 남부·신도시', birthW: 17, costIdx: 1.1, tutorIdx: 1.3, houseIdx: 1.6 },
-  { id: 'gyeongN', name: '경기 북부·외곽', birthW: 10, costIdx: 0.95, tutorIdx: 0.9, houseIdx: 1.0 },
-  { id: 'metro', name: '광역시', birthW: 19, costIdx: 0.9, tutorIdx: 0.9, houseIdx: 0.9 },
-  { id: 'midcity', name: '지방 중소도시', birthW: 21, costIdx: 0.85, tutorIdx: 0.7, houseIdx: 0.6 },
-  { id: 'rural', name: '농어촌', birthW: 12, costIdx: 0.8, tutorIdx: 0.4, houseIdx: 0.35 },
-  { id: 'sejong', name: '세종·제주', birthW: 8, costIdx: 0.9, tutorIdx: 0.8, houseIdx: 0.8 },
+  { id: 'gangnam', name: '서울 강남3구', city: '서울 강남', birthW: 5, costIdx: 1.45, tutorIdx: 2.1, houseIdx: 3.2 },
+  { id: 'seoulN', name: '서울 강북·기타', city: '서울 강북', birthW: 8, costIdx: 1.2, tutorIdx: 1.4, houseIdx: 2.0 },
+  { id: 'gyeongS', name: '경기 남부·신도시', city: '성남·수원', birthW: 17, costIdx: 1.1, tutorIdx: 1.3, houseIdx: 1.6 },
+  { id: 'gyeongN', name: '경기 북부·외곽', city: '의정부·파주', birthW: 10, costIdx: 0.95, tutorIdx: 0.9, houseIdx: 1.0 },
+  { id: 'busan', name: '부산광역시', city: '부산', birthW: 5, costIdx: 0.9, tutorIdx: 0.95, houseIdx: 0.9 },
+  { id: 'daegu', name: '대구광역시', city: '대구', birthW: 4, costIdx: 0.88, tutorIdx: 1.0, houseIdx: 0.8 },
+  { id: 'incheon', name: '인천광역시', city: '인천', birthW: 4, costIdx: 0.92, tutorIdx: 0.85, houseIdx: 0.85 },
+  { id: 'gwangju', name: '광주광역시', city: '광주', birthW: 2, costIdx: 0.88, tutorIdx: 0.9, houseIdx: 0.75 },
+  { id: 'daejeon', name: '대전광역시', city: '대전', birthW: 2, costIdx: 0.88, tutorIdx: 0.9, houseIdx: 0.75 },
+  { id: 'ulsan', name: '울산광역시', city: '울산', birthW: 2, costIdx: 0.9, tutorIdx: 0.8, houseIdx: 0.8 },
+  { id: 'midcity', name: '지방 중소도시', city: '천안·청주', birthW: 21, costIdx: 0.85, tutorIdx: 0.7, houseIdx: 0.6 },
+  { id: 'rural', name: '농어촌', city: '농어촌 군 단위', birthW: 12, costIdx: 0.8, tutorIdx: 0.4, houseIdx: 0.35 },
+  { id: 'sejong', name: '세종·제주', city: '세종·제주', birthW: 8, costIdx: 0.9, tutorIdx: 0.8, houseIdx: 0.8 },
 ];
+
+export const QUINTILE_LABEL = [
+  '소득 1분위 (하위 20%)',
+  '소득 2분위 (하위 20~40%)',
+  '소득 3분위 (중간층)',
+  '소득 4분위 (상위 20~40%)',
+  '소득 5분위 (상위 20%)',
+];
+
+// 한계소비성향 (가계동향 2024 평균소비성향 ≈70% 언저리 반영)
+export const MPC = [0.9, 0.8, 0.72, 0.65, 0.55];
 
 export interface FamilyType { id: string; name: string; w: number; money: number; mental: number; note: string }
 
@@ -37,7 +54,7 @@ export interface Focus { id: string; name: string; desc: string }
 export const FOCI: Focus[] = [
   { id: 'study', name: '공부', desc: '성적 +4, 건강 -1' },
   { id: 'sport', name: '운동', desc: '건강 +4, 성적 -1' },
-  { id: 'work', name: '알바·돈', desc: '돈 + (나이×10만), 멘탈 -1' },
+  { id: 'work', name: '알바·돈', desc: '월 30~80시간 × 최저시급' },
   { id: 'network', name: '인맥', desc: '인맥 +4' },
   { id: 'rest', name: '휴식', desc: '멘탈 +5, 건강 +1' },
   { id: 'art', name: '예체능', desc: '스타 도전권. 성적 -2' },

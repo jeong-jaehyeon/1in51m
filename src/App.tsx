@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  createGame, newSeed, stepYear, resolveChoice, resolveCancer, regionOf,
+  createGame, newSeed, stepYear, resolveChoice, resolveCancer, regionOf, buyLotto, dwellingLabel, autoPickChoice,
 } from './engine/sim';
-import type { GameState } from './engine/sim';
+import type { GameState, PendingChoice } from './engine/sim';
 import { drawPortrait } from './engine/portrait';
 import { saveGame, loadGame, clearSave, hasSave, wasWarned, markWarned } from './engine/save';
 import { renderMyCard, renderPaper, downloadCanvas } from './ui/share';
-import { FOCI, RATES, fmtMan } from './data/lookup';
+import { FOCI, RATES, fmtMan, QUINTILE_LABEL } from './data/lookup';
 import { REGIONS } from './data/lookup';
 import { jobLabel } from './data/jobs';
 import { WARNING, CONTACT, SOURCES, REFLECTIONS, MEMORIAL, shareText, FOOTER_NOTE } from './data/texts';
@@ -76,6 +76,15 @@ export default function App() {
       if (!st || st.over || st.pending || st.reflect || paused) return;
       st.auto = auto;
       stepYear(st);
+      // auto 안전망: 남은 pending 즉시 해소 (무한정지 방지)
+      const cur: { pending: PendingChoice | null } = st;
+      let guard = 0;
+      while (st.auto && cur.pending && guard++ < 5) {
+        const c: PendingChoice = cur.pending;
+        st.pending = null;
+        if (c.id === 'cancer') resolveCancer(st, 'std');
+        else resolveChoice(st, c.id, autoPickChoice(st, c));
+      }
       saveGame(st);
       if (st.over) {
         clearSave();
@@ -165,7 +174,7 @@ export default function App() {
           <div className="card">
             <h3>이 게임에 대하여</h3>
             <p className="muted">
-              8개 권역·소득 5분위·141개→한국 100개 대학·100개 직업의 실제 통계를 뼈대로,
+              13개 권역·소득 5분위·한국 100개 대학·100개 직업의 실제 통계를 뼈대로,
               같은 반 15명이 병렬로 살아가는 풀라이프 시뮬레이션입니다. 노력해도 통계를 벗어나기 어렵습니다.
               극소수에게만 역전이 허락됩니다.
             </p>
@@ -178,7 +187,7 @@ export default function App() {
         </div>
       )}
 
-      {screen === 'play' && st && <Play st={st} speed={speed} setSpeed={setSpeed} paused={paused} setPaused={setPaused} auto={auto} setAuto={setAuto} onChoice={pickChoice} reflectAge={st.reflect} journal={journal} setJournal={setJournal} onJournal={saveJournal} onSources={() => setShowSources(true)} bump={bump} />}
+      {screen === 'play' && st && <Play st={st} speed={speed} setSpeed={setSpeed} paused={paused} setPaused={setPaused} auto={auto} setAuto={setAuto} onChoice={pickChoice} reflectAge={st.reflect} journal={journal} setJournal={setJournal} onJournal={saveJournal} onSources={() => setShowSources(true)} bump={bump} say={say} />}
 
       {screen === 'end' && st && (
         <End st={st} say={say} onRebirth={() => { clearSave(); gameRef.current = null; setName(''); setScreen('start'); }} onSources={() => setShowSources(true)} />
@@ -223,7 +232,7 @@ function Play(props: {
   st: GameState; speed: 1 | 2 | 4; setSpeed: (s: 1 | 2 | 4) => void;
   paused: boolean; setPaused: (b: boolean) => void; auto: boolean; setAuto: (b: boolean) => void;
   onChoice: (key: string) => void; reflectAge: number | null; journal: string; setJournal: (s: string) => void;
-  onJournal: (skip: boolean) => void; onSources: () => void; bump: () => void;
+  onJournal: (skip: boolean) => void; onSources: () => void; bump: () => void; say: (t: string) => void;
 }) {
   const { st } = props;
   const p = st.player;
@@ -268,12 +277,13 @@ function Play(props: {
                 <div>
                   <div className="nm">{p.name}</div>
                   <dl>
-                    <dt>출생</dt><dd>{region.name} · {p.quintile}분위</dd>
+                    <dt>출생</dt><dd>{region.name} · {QUINTILE_LABEL[p.quintile - 1]}</dd>
                     <dt>가정</dt><dd>{(() => { const f = { both: '맞벌이 양부모', single: '외벌이 양부모', oneparent: '한부모', grand: '조손', multi: '다문화', care: '보육원' } as Record<string, string>; return f[p.familyId] ?? p.familyId; })()}{p.twin ? ' · 쌍둥이' : ''}</dd>
                     <dt>학력</dt><dd>{p.univName || (p.suneung > 0 ? `수능 ${p.suneung}등급` : st.age >= 19 ? '진학 없음' : '재학 중')}</dd>
-                    <dt>직업</dt><dd>{p.job ? jobLabel(p.job) : st.age >= 22 ? '무직' : '학생'}</dd>
+                    <dt>직업</dt><dd>{p.job ? (p.jobPlace || jobLabel(p.job)) : st.age >= 22 ? '무직' : '학생'}</dd>
+                    <dt>차</dt><dd>{p.car === 'none' ? '없음' : p.car === 'used' ? '중고차' : p.carLoan > 0 ? '신차(할부중)' : '신차'}</dd>
                     <dt>가족</dt><dd>{p.spouse ? `${p.spouse.name}와 혼인${p.divorced ? '(이혼)' : ''}` : '미혼'} · 자녀 {p.kids}명</dd>
-                    <dt>주거</dt><dd>{p.house === 'own' ? '자가' : p.house === 'jeonse' ? '전세' : '무주택'}</dd>
+                    <dt>주거</dt><dd>{dwellingLabel(st)}</dd>
                   </dl>
                 </div>
               </div>
@@ -289,6 +299,24 @@ function Play(props: {
                 <div><b>{p.job && !p.retired ? fmtMan(Math.round(p.salary / 12)) + '/월' : p.retired ? '연금생활' : '-'}</b><small>월 소득(세전)</small></div>
               </div>
               {p.loanLeft > 0 && <div className="small">학자금 잔여 {p.loanLeft}년</div>}
+              {st.age >= 20 && st.age <= 60 && (
+                <div className="row" style={{ marginTop: 8 }}>
+                  <button
+                    className="ghost"
+                    onClick={() => {
+                      const r = buyLotto(st);
+                      saveGame(st);
+                      props.say(r === 'win' ? '로또 1등 당첨!' : r === 'lose' ? '낙첨. 5천 원 증발.' : r === 'poor' ? '5천 원도 없다.' : '지금은 살 수 없다.');
+                      props.bump();
+                    }}
+                  >로또 사기 (0.5만)</button>
+                  <button
+                    className="chip"
+                    aria-pressed={p.autoLotto}
+                    onClick={() => { p.autoLotto = !p.autoLotto; saveGame(st); props.bump(); }}
+                  >자동구매 {p.autoLotto ? 'ON' : 'OFF'}</button>
+                </div>
+              )}
             </div>
           </div>
           <div className="col">
@@ -316,10 +344,24 @@ function Play(props: {
           </div>
           <div className="col">
             <div className="panel">
-              <h3>같은 반 {st.mates.length > 0 ? 15 : 0}명 · 생존 {aliveMates}명</h3>
+              <h3>같은 반 15명 · 생존 {aliveMates}명</h3>
               {st.mates.length === 0
-                ? <div className="muted">8세 입학 때 만난다.</div>
-                : <div className="muted">{st.mates.filter((m) => m.alive).slice(0, 8).map((m) => m.name).join(' · ')}{aliveMates > 8 ? ' …' : ''}</div>}
+                ? <div className="muted">초등 입학 때 만난다.</div>
+                : (
+                  <div className="paper2" style={{ marginTop: 0 }}>
+                    <table>
+                      <tbody>
+                        {st.mates.slice(0, 10).map((m) => (
+                          <tr key={m.name}>
+                            <td><b>{m.name}</b><br /><span className="small">{m.alive ? '생존' : `†${m.deathAge}세·${m.cause}`}</span></td>
+                            <td>{m.univ || (st.age >= 19 ? '고졸' : '재학중')} → {m.job || '-'}<br /><span className="small">{m.married ? `기혼·자녀${m.kids}` : '미혼'} · {fmtMan(m.peak)}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {st.mates.length > 10 && <div className="small">+{st.mates.length - 10}명 (사망증명서에서 전체 확인)</div>}
+                  </div>
+                )}
             </div>
             <div className="panel">
               <h3>기록</h3>
@@ -447,10 +489,10 @@ function End(props: { st: GameState; say: (t: string) => void; onRebirth: () => 
           </div>
           <div className="summary">
             <div><b>{p.univName || (p.suneung > 0 ? `수능 ${p.suneung}등급` : '진학 없음')}</b><small>학력</small></div>
-            <div><b>{p.job ? jobLabel(p.job) : '무직'}</b><small>직업</small></div>
+            <div><b>{p.job ? (p.jobPlace || jobLabel(p.job)) : '무직'}</b><small>직업</small></div>
             <div><b>{fmtMan(p.peak)}</b><small>전성기 연봉{p.lottoWon > 0 ? ` (로또 ${fmtMan(p.lottoWon)} 포함)` : ''}</small></div>
             <div><b>{p.spouse ? `기혼${p.divorced ? '(이혼)' : ''} · 자녀 ${p.kids}명` : '미혼'}</b><small>가족</small></div>
-            <div><b>{p.house === 'own' ? '자가' : p.house === 'jeonse' ? '전세' : '무주택'}</b><small>주거</small></div>
+            <div><b>{dwellingLabel(st)}</b><small>주거</small></div>
             <div><b>15명 중 {st.rank}등</b><small>같은 반 종합 순위 (수능3:대학3:소득4)</small></div>
           </div>
           {journals.length > 0 && (

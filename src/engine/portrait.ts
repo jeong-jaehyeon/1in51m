@@ -59,9 +59,16 @@ export function drawPortrait(
   // wrinkles 60+
   if (age >= 60) { for (let x = 5; x <= 10; x++) px(x, 10, shade); }
   if (age >= 75) { for (let x = 6; x <= 9; x++) px(x, 6, shade); }
-  // neck + body
+  // neck + body (gender silhouette: dress+earring vs broad shoulders)
   px(7, 13, shade); px(8, 13, shade);
-  for (let y = 14; y < H; y++) for (let x = 3; x <= 12; x++) px(x, y, top);
+  if (sex === 'F') {
+    for (let y = 14; y <= 16; y++) for (let x = 3; x <= 12; x++) px(x, y, top);
+    for (let y = 17; y < H; y++) for (let x = 2; x <= 13; x++) px(x, y, top);
+    px(2, 10, '#D9AF59'); px(13, 10, '#D9AF59');
+  } else {
+    for (let y = 14; y < H; y++) for (let x = 3; x <= 12; x++) px(x, y, top);
+    for (let x = 2; x <= 13; x++) px(x, 14, top);
+  }
   // collar / tie by quintile
   if (quintile >= 4) { px(7, 14, '#f5f5f5'); px(8, 14, '#f5f5f5'); }
   if (quintile >= 5) { px(7, 15, '#8C1D3C'); px(8, 15, '#8C1D3C'); px(7, 16, '#8C1D3C'); }

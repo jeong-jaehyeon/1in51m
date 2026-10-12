@@ -17,6 +17,24 @@ export function loadGame(): GameState | null {
     if (!raw) return null;
     const o = JSON.parse(raw) as GameState;
     if (!o || o.v !== 1 || !o.player) return null;
+    // migrate older saves (new fields default)
+    const pl = o.player as unknown as Record<string, unknown>;
+    const reg = (o.player as GameState['player']).regionIdx;
+    if (pl['homeIdx'] === undefined) pl['homeIdx'] = reg;
+    if (pl['liveIdx'] === undefined) pl['liveIdx'] = reg;
+    if (pl['dwelling'] === undefined) pl['dwelling'] = '본가';
+    if (pl['uniRegion'] === undefined) pl['uniRegion'] = reg;
+    if (pl['deposit'] === undefined) pl['deposit'] = 0;
+    if (pl['car'] === undefined) pl['car'] = 'none';
+    if (pl['carLoan'] === undefined) pl['carLoan'] = 0;
+    if (pl['huntTier'] === undefined) pl['huntTier'] = 'hs';
+    if (pl['jobPlace'] === undefined) pl['jobPlace'] = '';
+    if (pl['parentsAlive'] === undefined) pl['parentsAlive'] = true;
+    if (pl['autoLotto'] === undefined) pl['autoLotto'] = false;
+    if (pl['lastFlavor'] === undefined) pl['lastFlavor'] = '';
+    if (pl['nums'] === undefined) pl['nums'] = {};
+    if (pl['baseGrade'] === undefined) pl['baseGrade'] = (o.player as GameState['player']).grade;
+    if (pl['studyYrs'] === undefined) pl['studyYrs'] = 0;
     return o;
   } catch {
     return null;

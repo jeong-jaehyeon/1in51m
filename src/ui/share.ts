@@ -2,6 +2,7 @@
 
 import type { GameState } from '../engine/sim';
 import { fmtMan } from '../data/lookup';
+import { dwellingLabel } from '../engine/sim';
 import { REGIONS } from '../data/lookup';
 import { jobLabel } from '../data/jobs';
 import { drawPortrait } from '../engine/portrait';
@@ -52,7 +53,7 @@ export function renderMyCard(st: GameState): HTMLCanvasElement {
     ['직업', p.job ? jobLabel(p.job) : '무직'],
     ['전성기 연봉', `${fmtMan(p.peak)}${p.lottoWon > 0 ? ` (로또 ${fmtMan(p.lottoWon)} 포함)` : ''}`],
     ['결혼·자녀', p.spouse ? `기혼${p.divorced ? '(이혼)' : ''} · 자녀 ${p.kids}명` : '미혼'],
-    ['주거', p.house === 'own' ? '자가' : p.house === 'jeonse' ? '전세' : '무주택'],
+    ['주거', dwellingLabel(st)],
     ['반 등수', `15명 중 ${st.rank}등`],
   ];
   let y = 540;
