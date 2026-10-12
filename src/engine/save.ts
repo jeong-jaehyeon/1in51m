@@ -32,6 +32,7 @@ export function loadGame(): GameState | null {
     if (pl['parentsAlive'] === undefined) pl['parentsAlive'] = true;
     if (pl['autoLotto'] === undefined) pl['autoLotto'] = false;
     if (pl['lastFlavor'] === undefined) pl['lastFlavor'] = '';
+    if (pl['sibs'] === undefined) pl['sibs'] = [];
     if (pl['partner'] === undefined) pl['partner'] = null;
     else if (pl['partner']) {
       const pt = pl['partner'] as Record<string, unknown>;
